@@ -1,21 +1,15 @@
 #!/usr/bin/env python3
 import random
 from enum import Enum
+import copy
+from typing import Union
+from itertools import chain, repeat, islice
 
+def pad_infinite(iterable, padding=None):
+   return chain(iterable, repeat(padding))
 
-class NEAT(object):
-    connections = []
-    global_innovation = 0 
-
-    @classmethod
-    def add_connection(cls, new_connection):
-        for connection in cls.connections:
-            if new_connection == connection:
-                return connection.innovation
-        cls.connections.append(new_connection)
-        cls.global_innovation += 1
-        return cls.global_innovation
-
+def pad(iterable, size, padding=None):
+   return list(islice(pad_infinite(iterable, padding), size))
 
 class Connection(object):
     def __init__(self, in_node, out_node, weight):
@@ -39,6 +33,8 @@ class Connection(object):
         string = f'{string}Disabled: {not self.enabled}'
         return string
 
+    def __repr__(self):
+        return str(self.innovation)
 
 class NodeType(Enum):
     INPUT = 1
@@ -57,21 +53,24 @@ class Node(object):
         else:
             return False
 
-    def __add__(self, other):
+    def __add__(self, other: Union["Node", int]) -> int:
         if isinstance(other, Node):
             return self.id + other.id
         else:
             return self.id + other
+
+    def __hash__(self):
+        return hash(self.id)
 
     def __str__(self):
         return str(self.id)
 
 class Genome(object):
     def __init__(self, nodes, connections):
-        self.connections = connections
-        self.nodes = nodes
+        self.connections = copy.deepcopy(connections)
+        self.nodes = copy.deepcopy(nodes)
 
-    def add_connection(self):
+    def add_connection_mutation(self) -> None:
         while True:
             in_node = random.choice(self.nodes)
             # Do we want this?
@@ -88,7 +87,7 @@ class Genome(object):
                 self.connections.append(new_connection)
                 break
 
-    def add_node(self):
+    def add_node_mutation(self) -> None:
         new_node = Node(max(self.nodes, key=lambda x: x.id)+1, NodeType.HIDDEN)
         self.nodes.append(new_node)
         idx = random.randint(0, len(self.connections)-1)
@@ -110,13 +109,66 @@ class Genome(object):
         return string
 
 
+class NEAT(object):
+    connections = []
+    global_innovation = 0 
+
+    @classmethod
+    def add_connection(cls, new_connection:Connection) -> int:
+        for connection in cls.connections:
+            if new_connection == connection:
+                return connection.innovation
+        cls.connections.append(new_connection)
+        cls.global_innovation += 1
+        return cls.global_innovation
+
+    @staticmethod
+    def crossover(genome_1:Genome, genome_2:Genome) -> Genome:
+        connections = []
+        nodes = []
+        connections_1 = copy.deepcopy(genome_1.connections)
+        connections_2 = copy.deepcopy(genome_2.connections)
+        for i in range(min(len(connections_1), len(connections_2))):
+            if connections_1[i].innovation > connections_2[i].innovation:
+                connections_1.insert(i, None)
+            elif connections_1[i].innovation < connections_2[i].innovation:
+                connections_2.insert(i, None)
+            else:
+                pass
+
+        max_length = max(len(connections_1), len(connections_2))
+        connections_1 = pad(connections_1, max_length)
+        connections_2 = pad(connections_2, max_length)
+
+        for idx in range(max_length):
+            connection_1 = connections_1[idx]
+            connection_2 = connections_2[idx]
+            if connection_1 is None:
+                connection = connection_2
+            elif connection_2 is None:
+                connection = connection_1
+            else:
+                connection = random.choice([connection_1, connection_2])
+            connections.append(connection)
+
+        nodes = list(set(genome_1.nodes + genome_2.nodes))
+        return Genome(nodes, connections)
+        
+
 if __name__ == '__main__':
     nodes = [Node(0, NodeType.INPUT), Node(1, NodeType.OUTPUT)]
     connections = [Connection(nodes[0], nodes[1], random.random())]
-    new_genome = Genome(nodes, connections)
-    new_genome.add_node()
-    new_genome.add_connection()
-    new_genome.add_node()
-    new_genome.add_connection()
-    print(new_genome)
+    new_genome_1 = Genome(nodes, connections)
+    new_genome_1.add_node_mutation()
+    new_genome_1.add_connection_mutation()
+    print(new_genome_1)
+
+    connections = [Connection(nodes[0], nodes[1], random.random())]
+    new_genome_2 = Genome(nodes, connections)
+    new_genome_2.add_node_mutation()
+    new_genome_2.add_connection_mutation()
+    print(new_genome_2)
+
+    print(NEAT.crossover(new_genome_1, new_genome_2))
+
     
