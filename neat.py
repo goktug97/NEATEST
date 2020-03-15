@@ -2,14 +2,11 @@
 import random
 from enum import Enum
 import copy
-from typing import Union
+from typing import Union, List, Set
 from itertools import chain, repeat, islice
 
-def pad_infinite(iterable, padding=None):
-   return chain(iterable, repeat(padding))
-
-def pad(iterable, size, padding=None):
-   return list(islice(pad_infinite(iterable, padding), size))
+def pad_list(iterable, size, padding=None):
+   return list(islice(chain(iterable, repeat(padding)), size))
 
 class Connection(object):
     def __init__(self, in_node, out_node, weight):
@@ -35,6 +32,7 @@ class Connection(object):
 
     def __repr__(self):
         return str(self.innovation)
+
 
 class NodeType(Enum):
     INPUT = 1
@@ -64,6 +62,7 @@ class Node(object):
 
     def __str__(self):
         return str(self.id)
+
 
 class Genome(object):
     def __init__(self, nodes, connections):
@@ -110,8 +109,21 @@ class Genome(object):
 
 
 class NEAT(object):
-    connections = []
+    connections: List[Connection] = []
     global_innovation = 0 
+
+    @staticmethod
+    def random_genome(input_size: int, output_size: int) -> Genome:
+        connections: List[Connection] = []
+        nodes: Set[Node] = set()
+        for i in range(input_size):
+            for j in range(output_size):
+                input_node = Node(i, NodeType.INPUT)
+                output_node = Node(j+output_size, NodeType.OUTPUT)
+                nodes.add(input_node)
+                nodes.add(output_node)
+                connections += [Connection(input_node, output_node, random.random())]
+        return Genome(list(nodes), connections)
 
     @classmethod
     def add_connection(cls, new_connection:Connection) -> int:
@@ -124,8 +136,7 @@ class NEAT(object):
 
     @staticmethod
     def crossover(genome_1:Genome, genome_2:Genome) -> Genome:
-        connections = []
-        nodes = []
+        connections: List[Connection] = []
         connections_1 = copy.deepcopy(genome_1.connections)
         connections_2 = copy.deepcopy(genome_2.connections)
         for i in range(min(len(connections_1), len(connections_2))):
@@ -137,8 +148,8 @@ class NEAT(object):
                 pass
 
         max_length = max(len(connections_1), len(connections_2))
-        connections_1 = pad(connections_1, max_length)
-        connections_2 = pad(connections_2, max_length)
+        connections_1 = pad_list(connections_1, max_length)
+        connections_2 = pad_list(connections_2, max_length)
 
         for idx in range(max_length):
             connection_1 = connections_1[idx]
@@ -156,15 +167,18 @@ class NEAT(object):
         
 
 if __name__ == '__main__':
-    nodes = [Node(0, NodeType.INPUT), Node(1, NodeType.OUTPUT)]
-    connections = [Connection(nodes[0], nodes[1], random.random())]
-    new_genome_1 = Genome(nodes, connections)
+    new_genome_1 = NEAT.random_genome(1, 1)
+    new_genome_1.add_node_mutation()
+    new_genome_1.add_connection_mutation()
     new_genome_1.add_node_mutation()
     new_genome_1.add_connection_mutation()
     print(new_genome_1)
 
-    connections = [Connection(nodes[0], nodes[1], random.random())]
-    new_genome_2 = Genome(nodes, connections)
+    new_genome_2 = NEAT.random_genome(1, 1)
+    new_genome_2.add_node_mutation()
+    new_genome_2.add_connection_mutation()
+    new_genome_2.add_node_mutation()
+    new_genome_2.add_connection_mutation()
     new_genome_2.add_node_mutation()
     new_genome_2.add_connection_mutation()
     print(new_genome_2)
