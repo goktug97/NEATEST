@@ -1,2 +1,3 @@
 mypy.ini
 .mypy_cache
+__pycache__
