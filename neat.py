@@ -2,7 +2,7 @@
 import random
 from enum import Enum
 import copy
-from typing import Union, List, Set, Any, Tuple
+from typing import Union, List, Set, Any, Tuple, Dict
 from itertools import chain, repeat, islice, groupby
 import functools
 import math
@@ -56,6 +56,9 @@ class Connection(object):
         self.weight = weight
         self.enabled = True
         self.innovation = NEAT.add_connection(self)
+
+    def __hash__(self):
+        return hash(str(self.in_node)+str(self.out_node))
 
     def __eq__(self, other):
         if isinstance(other, Connection):
@@ -133,7 +136,7 @@ class Genome(object):
 
 
 class NEAT(object):
-    connections: List[Connection] = []
+    connections: Dict[Connection, int] = {}
     global_innovation: int = 0 
 
     @staticmethod
@@ -158,76 +161,14 @@ class NEAT(object):
             grouped_nodes.insert(1, [])
         return grouped_nodes
 
-    @staticmethod
-    def draw_genome(genome: Genome, hidden_nodes_per_layer: int = 4,
-                    node_radius: float = 0.05,
-                    distance: float = 0.25) -> None:
-        '''Draw the genome to a matplotlib figure but do not show it.'''
-        import matplotlib.pyplot as plt
-        import matplotlib.patches as patches
-        plt.gcf().canvas.set_window_title('float')
-
-        input_nodes, hidden_nodes, output_nodes = NEAT.group_nodes(genome.nodes)
-        
-        positions = {}
-        input_y_position = -distance * (len(input_nodes)-1) / 2
-        hidden_y_position = -distance * (hidden_nodes_per_layer-1) / 2
-        output_y_position = -distance * (len(output_nodes)-1) / 2
-        
-        for i, node in enumerate(input_nodes):
-            positions[f'{node.id}'] = (0.0, input_y_position + i*distance)
-        n_layers = math.ceil(len(hidden_nodes) / hidden_nodes_per_layer)
-        for i, node in enumerate(hidden_nodes):
-            if n_layers == i//hidden_nodes_per_layer+1:
-                hidden_y_position = -distance * (
-                    len(hidden_nodes) -
-                    i//hidden_nodes_per_layer*hidden_nodes_per_layer-1) / 2
-            positions[f'{node.id}'] = (
-                distance + (i//hidden_nodes_per_layer)*distance,
-                hidden_y_position + i%hidden_nodes_per_layer*distance)
-        for i, node in enumerate(output_nodes):
-            positions[f'{node.id}'] = ((n_layers+1)*distance,
-                                       output_y_position + i*distance)
-
-        for node in genome.nodes:
-            circle = plt.Circle(positions[f'{node.id}'],
-                                node_radius, color='r', fill=False)
-            text_x, text_y = positions[f'{node.id}']
-            plt.gcf().gca().text(*positions[f'{node.id}'], node.id,
-                                 horizontalalignment='center',
-                                 verticalalignment='center',
-                                 fontsize=10.0)
-            plt.gcf().gca().add_artist(circle)
-
-        kw = dict(arrowstyle="Simple,tail_width=0.5,head_width=4,head_length=8",
-                  color="k", antialiased=True)
-        for connection in genome.connections:
-            if connection.enabled:
-                node1_x = positions[f'{connection.in_node.id}'][0]
-                node2_x = positions[f'{connection.out_node.id}'][0]
-                node1_y = positions[f'{connection.in_node.id}'][1]
-                node2_y = positions[f'{connection.out_node.id}'][1]
-                angle = math.atan2(node2_x - node1_x, node2_y - node1_y)
-                x_adjustment = node_radius * math.sin(angle)
-                y_adjustment = node_radius * math.cos(angle)
-                connectionstyle = 'arc3'
-                arrow = patches.FancyArrowPatch((node1_x + x_adjustment,
-                                                 node1_y + y_adjustment),
-                                                (node2_x - x_adjustment,
-                                                 node2_y - y_adjustment),
-                                                connectionstyle=connectionstyle,
-                                                **kw)
-                plt.gcf().gca().add_patch(arrow)
-        plt.axis('scaled')
-
     @classmethod
     def add_connection(cls, new_connection:Connection) -> int:
-        for connection in cls.connections:
-            if new_connection == connection:
-                return connection.innovation
-        cls.connections.append(new_connection)
-        cls.global_innovation += 1
-        return cls.global_innovation
+        if new_connection in cls.connections:
+            return cls.connections[new_connection]
+        else:
+            cls.global_innovation += 1
+            cls.connections[new_connection] = cls.global_innovation
+            return cls.global_innovation
 
     @staticmethod
     def allign_connections(
@@ -294,11 +235,73 @@ class NEAT(object):
 
         nodes = list(set(genome_1.nodes + genome_2.nodes))
         return Genome(nodes, connections)
-        
 
+    @staticmethod
+    def draw_genome(genome: Genome, hidden_nodes_per_layer: int = 4,
+                    node_radius: float = 0.05,
+                    distance: float = 0.25) -> None:
+        '''Draw the genome to a matplotlib figure but do not show it.'''
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as patches
+        plt.gcf().canvas.set_window_title('float')
+
+        input_nodes, hidden_nodes, output_nodes = NEAT.group_nodes(genome.nodes)
+        
+        positions = {}
+        input_y_position = -distance * (len(input_nodes)-1) / 2
+        hidden_y_position = -distance * (hidden_nodes_per_layer-1) / 2
+        output_y_position = -distance * (len(output_nodes)-1) / 2
+        
+        for i, node in enumerate(input_nodes):
+            positions[f'{node.id}'] = (0.0, input_y_position + i*distance)
+        n_layers = math.ceil(len(hidden_nodes) / hidden_nodes_per_layer)
+        for i, node in enumerate(hidden_nodes):
+            if n_layers == i//hidden_nodes_per_layer+1:
+                hidden_y_position = -distance * (
+                    len(hidden_nodes) -
+                    i//hidden_nodes_per_layer*hidden_nodes_per_layer-1) / 2
+            positions[f'{node.id}'] = (
+                distance + (i//hidden_nodes_per_layer)*distance,
+                hidden_y_position + i%hidden_nodes_per_layer*distance)
+        for i, node in enumerate(output_nodes):
+            positions[f'{node.id}'] = ((n_layers+1)*distance,
+                                       output_y_position + i*distance)
+
+        for node in genome.nodes:
+            circle = plt.Circle(positions[f'{node.id}'],
+                                node_radius, color='r', fill=False)
+            text_x, text_y = positions[f'{node.id}']
+            plt.gcf().gca().text(*positions[f'{node.id}'], node.id,
+                                 horizontalalignment='center',
+                                 verticalalignment='center',
+                                 fontsize=10.0)
+            plt.gcf().gca().add_artist(circle)
+
+        kw = dict(arrowstyle="Simple,tail_width=0.5,head_width=4,head_length=8",
+                  color="k", antialiased=True)
+        for connection in genome.connections:
+            if connection.enabled:
+                node1_x = positions[f'{connection.in_node.id}'][0]
+                node2_x = positions[f'{connection.out_node.id}'][0]
+                node1_y = positions[f'{connection.in_node.id}'][1]
+                node2_y = positions[f'{connection.out_node.id}'][1]
+                angle = math.atan2(node2_x - node1_x, node2_y - node1_y)
+                x_adjustment = node_radius * math.sin(angle)
+                y_adjustment = node_radius * math.cos(angle)
+                connectionstyle = 'arc3'
+                arrow = patches.FancyArrowPatch((node1_x + x_adjustment,
+                                                 node1_y + y_adjustment),
+                                                (node2_x - x_adjustment,
+                                                 node2_y - y_adjustment),
+                                                connectionstyle=connectionstyle,
+                                                **kw)
+                plt.gcf().gca().add_patch(arrow)
+        plt.axis('scaled')
+
+        
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
     # TESTING
+    import matplotlib.pyplot as plt
     new_genome_1 = NEAT.random_genome(4, 2)
     new_genome_1.add_node_mutation()
     new_genome_1.add_connection_mutation()
@@ -308,6 +311,7 @@ if __name__ == '__main__':
     new_genome_1.add_connection_mutation()
     new_genome_1.add_node_mutation()
     new_genome_1.add_connection_mutation()
+    new_genome_1.weight_mutation()
     print(new_genome_1)
 
     new_genome_2 = NEAT.random_genome(4, 2)
@@ -323,6 +327,7 @@ if __name__ == '__main__':
     new_genome_2.add_node_mutation()
     new_genome_2.add_node_mutation()
     new_genome_2.add_connection_mutation()
+    new_genome_2.weight_mutation()
     print(new_genome_2)
 
     new_genome_3 = NEAT.crossover(new_genome_1, new_genome_2)
@@ -331,7 +336,5 @@ if __name__ == '__main__':
     new_genome_3.add_node_mutation()
     new_genome_3.weight_mutation()
     print(new_genome_3)
-    # print(new_genome_2.distance(new_genome_1, 1, 1, 0.4, 1))
     new_genome_3.draw()
-    # NEAT.draw_genome(new_genome_3)
     plt.show()
