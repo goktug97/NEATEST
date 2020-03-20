@@ -2,7 +2,7 @@
 import random
 from enum import Enum
 import copy
-from typing import Union, List, Set, Any, Tuple, Dict
+from typing import Union, List, Set, Any, Tuple, Dict, Callable
 from itertools import chain, repeat, islice, groupby
 import functools
 import math
@@ -24,12 +24,57 @@ class NodeType(Enum):
 
 
 class Node(object):
-    def __init__(self, id: int, type: NodeType):
+    def __init__(self, id: int, type: NodeType,
+                 activation: Callable[[float], float] = lambda x: x):
         self.id = id
         self.type = type
+        self.activation = activation
+        self._value = None
+        self.old_value = None
+        self.depth = float('inf')
+        self.visited = False
+
+        self.inputs = []
+        self.outputs = []
+
+    def calculate_depth(self, connections, depth=0):
+        min_depth = float('inf')
+        if self.type == NodeType.OUTPUT:
+            return float('inf')
+        connections_dict = dict(zip(connections, range(NEAT.global_innovation)))
+        if self.type == NodeType.INPUT:
+            self.visited = False
+            return depth
+        self.visited = True
+        for node in self.inputs:
+            if node.visited:
+                continue
+            idx = connections_dict[Connection(node, self, dummy=True)]
+            connection = connections[idx]
+            if connection.enabled:
+                tmp =  node.calculate_depth(connections, depth+1)
+                if tmp < min_depth:
+                    min_depth = tmp
+        self.visited = False
+        return min_depth
+
+    def update_depth(self, connections):
+        self.depth = self.calculate_depth(connections)
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, value):
+        self.old_value, self._value = self._value, value
+
+    def reset_values(self):
+        self._value = None
+        self.old_value = None
 
     def __hash__(self):
-        return hash(self.id)
+        return hash(str(self.id))
 
     def __eq__(self, other):
         if isinstance(other, Node):
@@ -45,20 +90,31 @@ class Node(object):
         else:
             raise ValueError(f'Value type should be Node or int, got {type(other)}')
 
+    def copy(self):
+        return copy.deepcopy(self)
+
     def __str__(self):
         return f'{self.id}:{self.type}'
 
+    def __repr__(self):
+        return str(self.id)
+
 
 class Connection(object):
-    def __init__(self, in_node: Node, out_node: Node, weight: float):
+    def __init__(self, in_node: Node, out_node: Node, weight: float = 1.0,
+                 dummy: bool = False):
         self.in_node = in_node
         self.out_node = out_node
+        if dummy: return
         self.weight = weight
         self.enabled = True
         self.innovation = NEAT.add_connection(self)
 
+        self.in_node.outputs.append(out_node)
+        self.out_node.inputs.append(in_node)
+
     def __hash__(self):
-        return hash(str(self.in_node)+str(self.out_node))
+        return hash(str(self.in_node.id)+str(self.out_node.id))
 
     def __eq__(self, other):
         if isinstance(other, Connection):
@@ -67,11 +123,14 @@ class Connection(object):
         else:
             raise ValueError(f'Value type should be Connection, got {type(other)}')
 
+    def copy(self):
+        return copy.deepcopy(self)
+
     def __str__(self):
         string = f'{self.in_node.id} -> {self.out_node.id} '
         string = f'{string}Weight: {self.weight:.3f} '
         string = f'{string}Innovation No: {self.innovation} '
-        string = f'{string}Disabled: {not self.enabled}'
+        string = f'{string}Disabled: {not self.enabled} '
         return string
 
     def __repr__(self):
@@ -80,8 +139,16 @@ class Connection(object):
 
 class Genome(object):
     def __init__(self, nodes: List[Node], connections: List[Connection]):
-        self.connections = copy.deepcopy(connections)
-        self.nodes = copy.deepcopy(nodes)
+        self.connections = connections
+        self.nodes = nodes
+
+        grouped_nodes = NEAT.group_nodes_by_type(self.nodes)
+        self.input_size = len(grouped_nodes[0])
+        self.output_size = len(grouped_nodes[2])
+        self.outputs = grouped_nodes[-1]
+
+        for node in self.nodes:
+            node.update_depth(self.connections)
 
     def weight_mutation(self) -> None:
         '''Apply weight mutation to connection weights.'''
@@ -93,18 +160,21 @@ class Genome(object):
 
     def add_connection_mutation(self) -> None:
         '''Create new connection between two random non-connected nodes.'''
-        in_node = random.choice(self.nodes)
-        out_node = random.choice(self.nodes)
-        new_connection = Connection(in_node, out_node, random.random())
-        for connection in self.connections:
-            if new_connection == connection:
-                return
-        self.connections.append(new_connection)
+        in_idx = random.randint(0, len(self.nodes)-1)
+        in_node = self.nodes[in_idx]
+        out_idx= random.randint(0, len(self.nodes)-1)
+        out_node = self.nodes[out_idx]
+        connection = Connection(in_node, out_node, dummy=True)
+        if connection in self.connections:
+            return
+        connection = Connection(in_node, out_node, random.random())
+        self.connections.append(connection)
+        for node in self.nodes:
+            node.update_depth(self.connections)
 
     def add_node_mutation(self) -> None:
         '''Add a node to a random connection and split the connection.'''
         new_node = Node(max(self.nodes, key=lambda x: x.id)+1, NodeType.HIDDEN)
-        self.nodes.append(new_node)
         idx = random.randint(0, len(self.connections)-1)
         self.connections[idx].enabled = False
         first_connection = Connection(self.connections[idx].in_node, new_node, 1)
@@ -112,6 +182,31 @@ class Genome(object):
         second_connection = Connection(new_node, self.connections[idx].out_node, weight)
         self.connections.append(first_connection)
         self.connections.append(second_connection)
+        self.nodes.append(new_node)
+        for node in self.nodes:
+            node.update_depth(self.connections)
+
+    def __call__(self, inputs: List[float]) -> List[float]:
+        self.nodes.sort(key=lambda x: x.depth)
+        connections = dict(zip(self.connections, range(NEAT.global_innovation)))
+        for node in self.nodes:
+            value = 0
+            if node.type == NodeType.INPUT:
+                value += inputs[node.id]
+            for input_node in node.inputs:
+                idx = connections[Connection(input_node, node, dummy=True)]
+                connection = self.connections[idx]
+                if connection.enabled:
+                    if input_node.depth >= node.depth:
+                        if input_node.old_value is not None:
+                            value += input_node.old_value * connection.weight
+                    else:
+                        value += input_node.value * connection.weight
+            node.value = node.activation(value)
+        return [node.value for node in self.outputs]
+        
+    def copy(self):
+        return copy.deepcopy(self)
 
     def crossover(self, other: 'Genome') -> 'Genome':
         '''Crossover the genome with the other genome.'''
@@ -139,26 +234,48 @@ class NEAT(object):
     connections: Dict[Connection, int] = {}
     global_innovation: int = 0 
 
+    def __init__(self, size: int, input_size: int, output_size: int):
+        self.population = self.create_population(size, input_size, output_size)
+        self.generation = 0
+
+    def forward(self, inputs: List[List[float]]) -> List[List[float]]:
+        outputs: List[List[float]] = []
+        for input, genome in zip(inputs, self.population):
+            outputs.append(genome.forward(input))
+        return outputs
+
+    @staticmethod
+    def create_population(size: int, input_size: int, output_size: int) -> List[Genome]:
+        population: List[Genome] = []
+        for _ in range(size):
+            population.append(NEAT.random_genome(input_size, output_size))
+        return population
+
     @staticmethod
     def random_genome(input_size: int, output_size: int) -> Genome:
         '''Create fc neural network without hidden layers with random weights.'''
         connections: List[Connection] = []
-        nodes: Set[Node] = set()
+        input_nodes = [Node(i, NodeType.INPUT) for i in range(input_size)]
+        output_nodes = [Node(i+input_size, NodeType.OUTPUT) for i in range(output_size)]
         for i in range(input_size):
+            input_node = input_nodes[i]
             for j in range(output_size):
-                input_node = Node(i, NodeType.INPUT)
-                output_node = Node(j+input_size, NodeType.OUTPUT)
-                nodes.add(input_node)
-                nodes.add(output_node)
+                output_node = output_nodes[j]
                 connections += [Connection(input_node, output_node, random.random())]
-        return Genome(list(nodes), connections)
+        return Genome(input_nodes+output_nodes, connections)
 
     @staticmethod
-    def group_nodes(nodes: List[Node]) -> List[List[Node]]:
+    def group_nodes_by_type(nodes: List[Node]) -> List[List[Node]]:
         sorted_nodes = sorted(nodes, key = lambda x: x.type)
         grouped_nodes = [list(it) for k, it in groupby(sorted_nodes, lambda x: x.type)]
         if len(grouped_nodes) == 2:
             grouped_nodes.insert(1, [])
+        return grouped_nodes
+
+    @staticmethod
+    def group_nodes_by_depth(nodes: List[Node]) -> List[List[Node]]:
+        sorted_nodes = sorted(nodes, key = lambda x: x.depth)
+        grouped_nodes = [list(it) for k, it in groupby(sorted_nodes, lambda x: x.depth)]
         return grouped_nodes
 
     @classmethod
@@ -177,6 +294,7 @@ class NEAT(object):
                 List[Union[Connection, None]],
                 List[Union[Connection, None]],
                 int, int, float]:
+        '''Destructively allign connections by their innovation number.'''
         connections_1.sort(key = lambda x: x.innovation)
         connections_2.sort(key = lambda x: x.innovation)
         weights = []
@@ -208,9 +326,24 @@ class NEAT(object):
         return excess*c1/N + disjoint*c2/N + avarage_weight_difference*c3
 
     @staticmethod
+    def merge_nodes(nodes_1: List[Node], nodes_2: List[Node]) -> List[Node]:
+        nodes = nodes_1 + nodes_2
+        nodes = sorted(nodes, key = lambda x: x.id)
+        grouped_nodes = [list(it) for k, it in groupby(nodes, lambda x: x.id)]
+        nodes = []
+        for group in grouped_nodes:
+            new_node = group[0].copy()
+            if len(group) > 1:
+                new_node.inputs = list(set(new_node.inputs + group[1].inputs))
+                new_node.outputs = list(set(new_node.outputs + group[1].outputs))
+            nodes.append(new_node)
+        return nodes
+
+    @staticmethod
     def crossover(genome_1:Genome, genome_2:Genome) -> Genome:
         '''Crossover two genomes by aligning their innovation numbers.'''
         connections: List[Connection] = []
+        nodes: List[Node] = []
         connections_1: Any = copy.deepcopy(genome_1.connections)
         connections_2: Any = copy.deepcopy(genome_2.connections)
         connections_1, connections_2, _, _, _ = NEAT.allign_connections(
@@ -220,20 +353,33 @@ class NEAT(object):
             connection_1 = connections_1[idx]
             connection_2 = connections_2[idx]
             if connection_1 is None:
-                connection = connection_2
+                connection = connection_2.copy()
                 if not connection_2.enabled:
                     connection.enabled = random.random() > 0.75
             elif connection_2 is None:
-                connection = connection_1
+                connection = connection_1.copy()
                 if not connection_1.enabled:
                     connection.enabled = random.random() > 0.75
             else:
-                connection = random.choice([connection_1, connection_2])
+                connection = random.choice([connection_1, connection_2]).copy()
                 if not (connection_1.enabled and connection_2.enabled):
                     connection.enabled = random.random() > 0.75
-            connections.append(connection)
+            in_node = Node(connection.in_node.id, connection.in_node.type,
+                           connection.in_node.activation)
+            out_node = Node(connection.out_node.id, connection.out_node.type,
+                           connection.out_node.activation)
 
-        nodes = list(set(genome_1.nodes + genome_2.nodes))
+            nodes_dict = dict(zip(nodes, range(len(nodes))))
+            if in_node not in nodes_dict:
+                nodes.append(in_node)
+                nodes_dict[in_node] = len(nodes)-1
+            if out_node not in nodes_dict:
+                nodes.append(out_node)
+                nodes_dict[out_node] = len(nodes)-1
+            connection = Connection(nodes[nodes_dict[in_node]],
+                                    nodes[nodes_dict[out_node]],
+                                    connection.weight)
+            connections.append(connection)
         return Genome(nodes, connections)
 
     @staticmethod
@@ -245,27 +391,13 @@ class NEAT(object):
         import matplotlib.patches as patches
         plt.gcf().canvas.set_window_title('float')
 
-        input_nodes, hidden_nodes, output_nodes = NEAT.group_nodes(genome.nodes)
-        
         positions = {}
-        input_y_position = -distance * (len(input_nodes)-1) / 2
-        hidden_y_position = -distance * (hidden_nodes_per_layer-1) / 2
-        output_y_position = -distance * (len(output_nodes)-1) / 2
-        
-        for i, node in enumerate(input_nodes):
-            positions[f'{node.id}'] = (0.0, input_y_position + i*distance)
-        n_layers = math.ceil(len(hidden_nodes) / hidden_nodes_per_layer)
-        for i, node in enumerate(hidden_nodes):
-            if n_layers == i//hidden_nodes_per_layer+1:
-                hidden_y_position = -distance * (
-                    len(hidden_nodes) -
-                    i//hidden_nodes_per_layer*hidden_nodes_per_layer-1) / 2
-            positions[f'{node.id}'] = (
-                distance + (i//hidden_nodes_per_layer)*distance,
-                hidden_y_position + i%hidden_nodes_per_layer*distance)
-        for i, node in enumerate(output_nodes):
-            positions[f'{node.id}'] = ((n_layers+1)*distance,
-                                       output_y_position + i*distance)
+        node_groups = NEAT.group_nodes_by_depth(genome.nodes)
+        for group_idx, nodes in enumerate(node_groups):
+            y_position = -distance * (len(nodes)-1)/2
+            for i, node in enumerate(nodes):
+                positions[f'{node.id}'] = (group_idx * distance,
+                                           y_position + i*distance)
 
         for node in genome.nodes:
             circle = plt.Circle(positions[f'{node.id}'],
@@ -302,7 +434,11 @@ class NEAT(object):
 if __name__ == '__main__':
     # TESTING
     import matplotlib.pyplot as plt
+    # population = NEAT.create_population(100, 3, 2)
+    # print(population)
     new_genome_1 = NEAT.random_genome(4, 2)
+    new_genome_1.add_node_mutation()
+    new_genome_1.add_node_mutation()
     new_genome_1.add_node_mutation()
     new_genome_1.add_connection_mutation()
     new_genome_1.add_node_mutation()
@@ -315,6 +451,8 @@ if __name__ == '__main__':
     print(new_genome_1)
 
     new_genome_2 = NEAT.random_genome(4, 2)
+    new_genome_2.add_node_mutation()
+    new_genome_2.add_connection_mutation()
     new_genome_2.add_node_mutation()
     new_genome_2.add_connection_mutation()
     new_genome_2.add_node_mutation()
@@ -335,6 +473,7 @@ if __name__ == '__main__':
     new_genome_3.add_node_mutation()
     new_genome_3.add_node_mutation()
     new_genome_3.weight_mutation()
+    new_genome_3([1, 1, 2, 3])
     print(new_genome_3)
     new_genome_3.draw()
     plt.show()
