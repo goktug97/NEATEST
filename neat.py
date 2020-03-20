@@ -34,10 +34,11 @@ class Node(object):
         self.depth = float('inf')
         self.visited = False
 
-        self.inputs = []
-        self.outputs = []
+        self.inputs: List[Node] = []
+        self.outputs: List[Node] = []
 
-    def calculate_depth(self, connections, depth=0):
+    def calculate_depth(self, connections: List['Connection'], depth:int=0) -> float:
+        '''Calculate minimum distance to a input node, infinite if node is an output.'''
         min_depth = float('inf')
         if self.type == NodeType.OUTPUT:
             return float('inf')
@@ -58,7 +59,7 @@ class Node(object):
         self.visited = False
         return min_depth
 
-    def update_depth(self, connections):
+    def update_depth(self, connections: List['Connection']) -> None:
         self.depth = self.calculate_depth(connections)
 
     @property
@@ -190,7 +191,7 @@ class Genome(object):
         self.nodes.sort(key=lambda x: x.depth)
         connections = dict(zip(self.connections, range(NEAT.global_innovation)))
         for node in self.nodes:
-            value = 0
+            value = 0.0
             if node.type == NodeType.INPUT:
                 value += inputs[node.id]
             for input_node in node.inputs:
@@ -241,7 +242,7 @@ class NEAT(object):
     def forward(self, inputs: List[List[float]]) -> List[List[float]]:
         outputs: List[List[float]] = []
         for input, genome in zip(inputs, self.population):
-            outputs.append(genome.forward(input))
+            outputs.append(genome(input))
         return outputs
 
     @staticmethod
@@ -473,7 +474,7 @@ if __name__ == '__main__':
     new_genome_3.add_node_mutation()
     new_genome_3.add_node_mutation()
     new_genome_3.weight_mutation()
-    new_genome_3([1, 1, 2, 3])
+    new_genome_3([1.1, 1.2, 2.3, 3.1])
     print(new_genome_3)
     new_genome_3.draw()
     plt.show()
