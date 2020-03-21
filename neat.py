@@ -327,20 +327,6 @@ class NEAT(object):
         return excess*c1/N + disjoint*c2/N + avarage_weight_difference*c3
 
     @staticmethod
-    def merge_nodes(nodes_1: List[Node], nodes_2: List[Node]) -> List[Node]:
-        nodes = nodes_1 + nodes_2
-        nodes = sorted(nodes, key = lambda x: x.id)
-        grouped_nodes = [list(it) for k, it in groupby(nodes, lambda x: x.id)]
-        nodes = []
-        for group in grouped_nodes:
-            new_node = group[0].copy()
-            if len(group) > 1:
-                new_node.inputs = list(set(new_node.inputs + group[1].inputs))
-                new_node.outputs = list(set(new_node.outputs + group[1].outputs))
-            nodes.append(new_node)
-        return nodes
-
-    @staticmethod
     def crossover(genome_1:Genome, genome_2:Genome) -> Genome:
         '''Crossover two genomes by aligning their innovation numbers.'''
         connections: List[Connection] = []
@@ -398,20 +384,15 @@ class NEAT(object):
             y_position = -distance * (len(nodes)-1)/2
             for i, node in enumerate(nodes):
                 positions[f'{node.id}'] = (group_idx * distance,
-                                           y_position + i*distance)
+                                          y_position + i*distance)
+                circle = plt.Circle(positions[f'{node.id}'],
+                                    node_radius, color='r', fill=False)
+                plt.gcf().gca().text(*positions[f'{node.id}'], node.id,
+                                     horizontalalignment='center',
+                                     verticalalignment='center',
+                                     fontsize=10.0)
+                plt.gcf().gca().add_artist(circle)
 
-        for node in genome.nodes:
-            circle = plt.Circle(positions[f'{node.id}'],
-                                node_radius, color='r', fill=False)
-            text_x, text_y = positions[f'{node.id}']
-            plt.gcf().gca().text(*positions[f'{node.id}'], node.id,
-                                 horizontalalignment='center',
-                                 verticalalignment='center',
-                                 fontsize=10.0)
-            plt.gcf().gca().add_artist(circle)
-
-        kw = dict(arrowstyle="Simple,tail_width=0.5,head_width=4,head_length=8",
-                  color="k", antialiased=True)
         for connection in genome.connections:
             if connection.enabled:
                 node1_x = positions[f'{connection.in_node.id}'][0]
@@ -421,13 +402,13 @@ class NEAT(object):
                 angle = math.atan2(node2_x - node1_x, node2_y - node1_y)
                 x_adjustment = node_radius * math.sin(angle)
                 y_adjustment = node_radius * math.cos(angle)
-                connectionstyle = 'arc3'
-                arrow = patches.FancyArrowPatch((node1_x + x_adjustment,
-                                                 node1_y + y_adjustment),
-                                                (node2_x - x_adjustment,
-                                                 node2_y - y_adjustment),
-                                                connectionstyle=connectionstyle,
-                                                **kw)
+                arrow = patches.FancyArrowPatch(
+                    (node1_x + x_adjustment,
+                     node1_y + y_adjustment),
+                    (node2_x - x_adjustment,
+                     node2_y - y_adjustment),
+                    arrowstyle="Simple,tail_width=0.5,head_width=3,head_length=5",
+                    color="k", antialiased=True)
                 plt.gcf().gca().add_patch(arrow)
         plt.axis('scaled')
 
@@ -474,6 +455,9 @@ if __name__ == '__main__':
     new_genome_3.add_node_mutation()
     new_genome_3.add_node_mutation()
     new_genome_3.weight_mutation()
+    new_genome_3([1.1, 1.2, 2.3, 3.1])
+    new_genome_3([1.1, 1.2, 2.3, 3.1])
+    new_genome_3([1.1, 1.2, 2.3, 3.1])
     new_genome_3([1.1, 1.2, 2.3, 3.1])
     print(new_genome_3)
     new_genome_3.draw()
