@@ -16,8 +16,9 @@ def pad_list(iterable, size, padding=None):
 @functools.total_ordering
 class NodeType(Enum):
     INPUT = 1
-    HIDDEN = 2
-    OUTPUT = 3
+    BIAS = 2
+    HIDDEN = 3
+    OUTPUT = 4
 
     def __gt__(self, other):
         return self.value > other.value
@@ -25,11 +26,12 @@ class NodeType(Enum):
 
 class Node(object):
     def __init__(self, id: int, type: NodeType,
-                 activation: Callable[[float], float] = lambda x: x):
+                 activation: Callable[[float], float] = lambda x: x,
+                 value: Union[float, None] = None):
         self.id = id
         self.type = type
         self.activation = activation
-        self._value = None
+        self._value = value
         self.old_value = None
         self.depth = float('inf')
         self.visited = False
@@ -41,7 +43,7 @@ class Node(object):
         min_depth = float('inf')
         if self.type == NodeType.OUTPUT:
             return float('inf')
-        if self.type == NodeType.INPUT:
+        elif self.type == NodeType.INPUT or self.type == NodeType.BIAS:
             self.visited = False
             return depth
         self.visited = True
@@ -140,7 +142,7 @@ class Genome(object):
 
         grouped_nodes = NEAT.group_nodes_by_type(self.nodes)
         self.input_size = len(grouped_nodes[0])
-        self.output_size = len(grouped_nodes[2])
+        self.output_size = len(grouped_nodes[-1])
         self.outputs = grouped_nodes[-1]
 
         for node in self.nodes:
@@ -161,7 +163,8 @@ class Genome(object):
         out_idx= random.randint(0, len(self.nodes)-1)
         out_node = self.nodes[out_idx]
         connection = Connection(in_node, out_node, dummy=True)
-        if connection in out_node.inputs:
+        if connection in out_node.inputs or out_node.type == NodeType.BIAS:
+            self.add_connection_mutation()
             return
         connection = Connection(in_node, out_node, random.random())
         self.connections.append(connection)
@@ -245,12 +248,15 @@ class NEAT(object):
         return population
 
     @staticmethod
-    def random_genome(input_size: int, output_size: int) -> Genome:
+    def random_genome(input_size: int, output_size: int, bias: bool = False) -> Genome:
         '''Create fc neural network without hidden layers with random weights.'''
         connections: List[Connection] = []
         input_nodes = [Node(i, NodeType.INPUT) for i in range(input_size)]
-        output_nodes = [Node(i+input_size, NodeType.OUTPUT) for i in range(output_size)]
-        for i in range(input_size):
+        if bias:
+            input_nodes.append(Node(input_size, NodeType.BIAS, value=1.0))
+        output_nodes = [Node(i+len(input_nodes), NodeType.OUTPUT)
+                        for i in range(output_size)]
+        for i in range(len(input_nodes)):
             input_node = input_nodes[i]
             for j in range(output_size):
                 output_node = output_nodes[j]
@@ -261,8 +267,6 @@ class NEAT(object):
     def group_nodes_by_type(nodes: List[Node]) -> List[List[Node]]:
         sorted_nodes = sorted(nodes, key = lambda x: x.type)
         grouped_nodes = [list(it) for k, it in groupby(sorted_nodes, lambda x: x.type)]
-        if len(grouped_nodes) == 2:
-            grouped_nodes.insert(1, [])
         return grouped_nodes
 
     @staticmethod
@@ -362,7 +366,7 @@ class NEAT(object):
         return Genome(nodes, connections)
 
     @staticmethod
-    def draw_genome(genome: Genome, hidden_nodes_per_layer: int = 4,
+    def draw_genome(genome: Genome,
                     node_radius: float = 0.05,
                     distance: float = 0.25) -> None:
         '''Draw the genome to a matplotlib figure but do not show it.'''
@@ -410,7 +414,7 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     # population = NEAT.create_population(100, 3, 2)
     # print(population)
-    new_genome_1 = NEAT.random_genome(4, 2)
+    new_genome_1 = NEAT.random_genome(4, 2, True)
     new_genome_1.add_node_mutation()
     new_genome_1.add_node_mutation()
     new_genome_1.add_node_mutation()
@@ -424,7 +428,7 @@ if __name__ == '__main__':
     new_genome_1.weight_mutation()
     print(new_genome_1)
 
-    new_genome_2 = NEAT.random_genome(4, 2)
+    new_genome_2 = NEAT.random_genome(4, 2, True)
     new_genome_2.add_node_mutation()
     new_genome_2.add_connection_mutation()
     new_genome_2.add_node_mutation()
