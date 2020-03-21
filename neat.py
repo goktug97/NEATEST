@@ -34,33 +34,29 @@ class Node(object):
         self.depth = float('inf')
         self.visited = False
 
-        self.inputs: List[Node] = []
-        self.outputs: List[Node] = []
+        self.inputs: List[Connection] = []
 
-    def calculate_depth(self, connections: List['Connection'], depth:int=0) -> float:
+    def calculate_depth(self, depth:int=0) -> float:
         '''Calculate minimum distance to a input node, infinite if node is an output.'''
         min_depth = float('inf')
         if self.type == NodeType.OUTPUT:
             return float('inf')
-        connections_dict = dict(zip(connections, range(NEAT.global_innovation)))
         if self.type == NodeType.INPUT:
             self.visited = False
             return depth
         self.visited = True
-        for node in self.inputs:
-            if node.visited:
+        for connection in self.inputs:
+            if connection.in_node.visited:
                 continue
-            idx = connections_dict[Connection(node, self, dummy=True)]
-            connection = connections[idx]
             if connection.enabled:
-                tmp =  node.calculate_depth(connections, depth+1)
+                tmp =  connection.in_node.calculate_depth(depth+1)
                 if tmp < min_depth:
                     min_depth = tmp
         self.visited = False
         return min_depth
 
-    def update_depth(self, connections: List['Connection']) -> None:
-        self.depth = self.calculate_depth(connections)
+    def update_depth(self) -> None:
+        self.depth = self.calculate_depth()
 
     @property
     def value(self):
@@ -111,8 +107,7 @@ class Connection(object):
         self.enabled = True
         self.innovation = NEAT.add_connection(self)
 
-        self.in_node.outputs.append(out_node)
-        self.out_node.inputs.append(in_node)
+        self.out_node.inputs.append(self)
 
     def __hash__(self):
         return hash(str(self.in_node.id)+str(self.out_node.id))
@@ -149,7 +144,7 @@ class Genome(object):
         self.outputs = grouped_nodes[-1]
 
         for node in self.nodes:
-            node.update_depth(self.connections)
+            node.update_depth()
 
     def weight_mutation(self) -> None:
         '''Apply weight mutation to connection weights.'''
@@ -166,12 +161,12 @@ class Genome(object):
         out_idx= random.randint(0, len(self.nodes)-1)
         out_node = self.nodes[out_idx]
         connection = Connection(in_node, out_node, dummy=True)
-        if connection in self.connections:
+        if connection in out_node.inputs:
             return
         connection = Connection(in_node, out_node, random.random())
         self.connections.append(connection)
         for node in self.nodes:
-            node.update_depth(self.connections)
+            node.update_depth()
 
     def add_node_mutation(self) -> None:
         '''Add a node to a random connection and split the connection.'''
@@ -185,31 +180,28 @@ class Genome(object):
         self.connections.append(second_connection)
         self.nodes.append(new_node)
         for node in self.nodes:
-            node.update_depth(self.connections)
+            node.update_depth()
 
     def __call__(self, inputs: List[float]) -> List[float]:
         self.nodes.sort(key=lambda x: x.depth)
-        connections = dict(zip(self.connections, range(NEAT.global_innovation)))
         for node in self.nodes:
             value = 0.0
             if node.type == NodeType.INPUT:
                 value += inputs[node.id]
-            for input_node in node.inputs:
-                idx = connections[Connection(input_node, node, dummy=True)]
-                connection = self.connections[idx]
+            for connection in node.inputs:
                 if connection.enabled:
-                    if input_node.depth >= node.depth:
-                        if input_node.old_value is not None:
-                            value += input_node.old_value * connection.weight
+                    if connection.in_node.depth >= node.depth:
+                        if connection.in_node.old_value is not None:
+                            value += connection.in_node.old_value * connection.weight
                     else:
-                        value += input_node.value * connection.weight
+                        value += connection.in_node.value * connection.weight
             node.value = node.activation(value)
         return [node.value for node in self.outputs]
         
     def copy(self):
         return copy.deepcopy(self)
 
-    def crossover(self, other: 'Genome') -> 'Genome':
+    def crossover(self, other: 'Genome'):
         '''Crossover the genome with the other genome.'''
         return NEAT.crossover(self, other)
 
@@ -450,7 +442,7 @@ if __name__ == '__main__':
     new_genome_2.weight_mutation()
     print(new_genome_2)
 
-    new_genome_3 = NEAT.crossover(new_genome_1, new_genome_2)
+    new_genome_3 = new_genome_1.crossover(new_genome_2)
     new_genome_3.add_node_mutation()
     new_genome_3.add_node_mutation()
     new_genome_3.add_node_mutation()
