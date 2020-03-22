@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, Callable
 import math
 import copy
 import random
@@ -43,9 +43,11 @@ class Genome(object):
         for node in self.nodes:
             node.update_depth()
 
-    def add_node_mutation(self) -> None:
+    def add_node_mutation(self,
+                          activation: Callable[[float], float]=lambda x: x) -> None:
         '''Add a node to a random connection and split the connection.'''
-        new_node = Node(max(self.nodes, key=lambda x: x.id)+1, NodeType.HIDDEN)
+        new_node = Node(max(self.nodes, key=lambda x: x.id)+1,
+                        NodeType.HIDDEN, activation)
         idx = random.randint(0, len(self.connections)-1)
         self.connections[idx].enabled = False
         first_connection = Connection(self.connections[idx].in_node, new_node, 1)
@@ -72,6 +74,10 @@ class Genome(object):
                         value += connection.in_node.value * connection.weight
             node.value = node.activation(value)
         return [node.value for node in self.outputs]
+
+    @property
+    def size(self):
+        return len(list(filter(lambda x: x.enabled, self.connections)))
         
     def copy(self):
         return copy.deepcopy(self)
@@ -84,8 +90,8 @@ class Genome(object):
         draw_genome(self)
 
     def distance(self, other: 'Genome',
-                 c1: float, c2: float, c3: float, N: int) -> float:
-        return distance(self, other, c1, c2, c3, N)
+                 c1: float, c2: float, c3: float) -> float:
+        return distance(self, other, c1, c2, c3)
 
     def __str__(self):
         string = ''
@@ -97,23 +103,10 @@ class Genome(object):
             string = f'{string}{connection}\n'
         return string
 
-def random_genome(input_size: int, output_size: int, bias: bool = False) -> Genome:
-    '''Create fc neural network without hidden layers with random weights.'''
-    connections: List[Connection] = []
-    input_nodes = [Node(i, NodeType.INPUT) for i in range(input_size)]
-    if bias:
-        input_nodes.append(Node(input_size, NodeType.BIAS, value=1.0))
-    output_nodes = [Node(i+len(input_nodes), NodeType.OUTPUT)
-                    for i in range(output_size)]
-    for i in range(len(input_nodes)):
-        input_node = input_nodes[i]
-        for j in range(output_size):
-            output_node = output_nodes[j]
-            connections += [Connection(input_node, output_node, random.random())]
-    return Genome(input_nodes+output_nodes, connections)
-
 def distance(genome_1: Genome, genome_2: Genome,
-             c1: float, c2: float, c3: float, N: int) -> float:
+             c1: float, c2: float, c3: float) -> float:
+    N = (1 if (genome_1.size < 20 and genome_2.size < 20)
+         else max(genome_1.size, genome_2.size))
     connections_1: Any = copy.deepcopy(genome_1.connections)
     connections_2: Any = copy.deepcopy(genome_2.connections)
     _, _, disjoint, excess, avarage_weight_difference = allign_connections(

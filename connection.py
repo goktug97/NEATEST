@@ -21,12 +21,12 @@ class Connection(object):
         if dummy: return
         self.weight = weight
         self.enabled = True
-        self.innovation = Connection.add_connection(self)
+        self.innovation = Connection.register_connection(self)
 
         self.out_node.inputs.append(self)
 
     @classmethod
-    def add_connection(cls, new_connection:'Connection') -> int:
+    def register_connection(cls, new_connection:'Connection') -> int:
         if new_connection in cls.connections:
             return cls.connections[new_connection]
         else:
