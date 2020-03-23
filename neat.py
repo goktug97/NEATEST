@@ -90,7 +90,7 @@ class NEAT(object):
                  disable_rate: float = 0.75,
                  stegnant_threshold: int = 15,
                  random_range: Tuple[float, float] = (-1.0, 1.0),
-                 noise_magnitude: float = 0.1,
+                 noise_magnitude: float = 0.001,
                  input_activation: Callable[[float], float]=steepened_sigmoid,
                  hidden_activation: Callable[[float], float]=steepened_sigmoid,
                  output_activation: Callable[[float], float]=steepened_sigmoid):

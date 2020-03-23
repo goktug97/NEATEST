@@ -31,18 +31,22 @@ class Genome(object):
 
     def add_connection_mutation(self, random_range: Tuple[float, float]) -> None:
         '''Create new connection between two random non-connected nodes.'''
-        in_idx = random.randint(0, len(self.nodes) - 1)
-        in_node = self.nodes[in_idx]
-        out_idx = random.randint(0, len(self.nodes) - 1)
-        out_node = self.nodes[out_idx]
-        connection = Connection(in_node, out_node, dummy=True)
-        if connection in out_node.inputs or out_node.type == NodeType.BIAS:
-            self.add_connection_mutation(random_range)
-            return
-        connection = Connection(in_node, out_node, random.uniform(*random_range))
-        self.connections.append(connection)
-        for node in self.nodes:
-            node.update_depth()
+        def _add_connection_mutation(depth = 0):
+            in_idx = random.randint(0, len(self.nodes) - 1)
+            in_node = self.nodes[in_idx]
+            out_idx = random.randint(0, len(self.nodes) - 1)
+            out_node = self.nodes[out_idx]
+            connection = Connection(in_node, out_node, dummy=True)
+            if connection in out_node.inputs or out_node.type == NodeType.BIAS:
+                if depth > 20:
+                    return
+                _add_connection_mutation(depth+1)
+                return
+            connection = Connection(in_node, out_node, random.uniform(*random_range))
+            self.connections.append(connection)
+            for node in self.nodes:
+                node.update_depth()
+        _add_connection_mutation()
 
     def add_node_mutation(self,
                           activation: Callable[[float], float]=lambda x: x) -> None:
