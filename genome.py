@@ -24,7 +24,7 @@ class Genome(object):
         '''Apply weight mutation to connection weights.'''
         for connection in self.connections:
             if random.random() <= 0.1:
-                connection.weight = random.random()
+                connection.weight = random.uniform(-1.0, 1.0)
             else:
                 connection.weight += random.uniform(-0.1, 0.1)
 
@@ -38,7 +38,7 @@ class Genome(object):
         if connection in out_node.inputs or out_node.type == NodeType.BIAS:
             self.add_connection_mutation()
             return
-        connection = Connection(in_node, out_node, random.random())
+        connection = Connection(in_node, out_node, random.uniform(-1.0, 1.0))
         self.connections.append(connection)
         for node in self.nodes:
             node.update_depth()
@@ -86,8 +86,10 @@ class Genome(object):
         '''Crossover the genome with the other genome.'''
         return crossover(self, other)
 
-    def draw(self) -> None:
-        draw_genome(self)
+    def draw(self, node_radius: float = 0.05,
+             vertical_distance: float = 0.25,
+             horizontal_distance: float = 0.25) -> None:
+        draw_genome(self, node_radius, vertical_distance, horizontal_distance)
 
     def distance(self, other: 'Genome',
                  c1: float, c2: float, c3: float) -> float:
@@ -107,13 +109,14 @@ def distance(genome_1: Genome, genome_2: Genome,
              c1: float, c2: float, c3: float) -> float:
     N = (1 if (genome_1.size < 20 and genome_2.size < 20)
          else max(genome_1.size, genome_2.size))
+    N = 1
     connections_1: Any = copy.deepcopy(genome_1.connections)
     connections_2: Any = copy.deepcopy(genome_2.connections)
     _, _, disjoint, excess, avarage_weight_difference = allign_connections(
         connections_1, connections_2)
     return excess*c1/N + disjoint*c2/N + avarage_weight_difference*c3
 
-def crossover(genome_1:Genome, genome_2:Genome) -> Genome:
+def crossover(genome_1:Genome, genome_2:Genome, disable_rate: float = 0.75) -> Genome:
     '''Crossover two genomes by aligning their innovation numbers.'''
     connections: List[Connection] = []
     nodes: List[Node] = []
@@ -128,15 +131,15 @@ def crossover(genome_1:Genome, genome_2:Genome) -> Genome:
         if connection_1 is None:
             connection = connection_2.copy()
             if not connection_2.enabled:
-                connection.enabled = random.random() > 0.75
+                connection.enabled = random.random() > disable_rate
         elif connection_2 is None:
             connection = connection_1.copy()
             if not connection_1.enabled:
-                connection.enabled = random.random() > 0.75
+                connection.enabled = random.random() > disable_rate
         else:
             connection = random.choice([connection_1, connection_2]).copy()
             if not (connection_1.enabled and connection_2.enabled):
-                connection.enabled = random.random() > 0.75
+                connection.enabled = random.random() > disable_rate
         in_node = Node(connection.in_node.id, connection.in_node.type,
                        connection.in_node.activation)
         out_node = Node(connection.out_node.id, connection.out_node.type,
@@ -157,7 +160,8 @@ def crossover(genome_1:Genome, genome_2:Genome) -> Genome:
 
 def draw_genome(genome: Genome,
                 node_radius: float = 0.05,
-                distance: float = 0.25) -> None:
+                vertical_distance: float = 0.25,
+                horizontal_distance: float = 0.25) -> None:
     '''Draw the genome to a matplotlib figure but do not show it.'''
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
@@ -166,10 +170,10 @@ def draw_genome(genome: Genome,
     positions = {}
     node_groups = group_nodes_by_depth(genome.nodes)
     for group_idx, nodes in enumerate(node_groups):
-        y_position = -distance * (len(nodes)-1)/2
+        y_position = -vertical_distance * (len(nodes)-1)/2
         for i, node in enumerate(nodes):
-            positions[f'{node.id}'] = (group_idx * distance,
-                                      y_position + i*distance)
+            positions[f'{node.id}'] = (group_idx * horizontal_distance,
+                                       y_position + i*vertical_distance)
             circle = plt.Circle(positions[f'{node.id}'],
                                 node_radius, color='r', fill=False)
             plt.gcf().gca().text(*positions[f'{node.id}'], node.id,
