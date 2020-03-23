@@ -1,4 +1,4 @@
-from typing import List, Any, Callable
+from typing import List, Any, Callable, Tuple
 import math
 import copy
 import random
@@ -20,15 +20,16 @@ class Genome(object):
         for node in self.nodes:
             node.update_depth()
 
-    def weight_mutation(self) -> None:
+    def weight_mutation(self, magnitude: float,
+                        random_range: Tuple[float, float]) -> None:
         '''Apply weight mutation to connection weights.'''
         for connection in self.connections:
             if random.random() <= 0.1:
-                connection.weight = random.uniform(-1.0, 1.0)
+                connection.weight = random.uniform(*random_range)
             else:
-                connection.weight += random.uniform(-0.1, 0.1)
+                connection.weight += random.uniform(-magnitude, magnitude)
 
-    def add_connection_mutation(self) -> None:
+    def add_connection_mutation(self, random_range: Tuple[float, float]) -> None:
         '''Create new connection between two random non-connected nodes.'''
         in_idx = random.randint(0, len(self.nodes) - 1)
         in_node = self.nodes[in_idx]
@@ -36,9 +37,9 @@ class Genome(object):
         out_node = self.nodes[out_idx]
         connection = Connection(in_node, out_node, dummy=True)
         if connection in out_node.inputs or out_node.type == NodeType.BIAS:
-            self.add_connection_mutation()
+            self.add_connection_mutation(random_range)
             return
-        connection = Connection(in_node, out_node, random.uniform(-1.0, 1.0))
+        connection = Connection(in_node, out_node, random.uniform(*random_range))
         self.connections.append(connection)
         for node in self.nodes:
             node.update_depth()
@@ -46,10 +47,10 @@ class Genome(object):
     def add_node_mutation(self,
                           activation: Callable[[float], float]=lambda x: x) -> None:
         '''Add a node to a random connection and split the connection.'''
-        new_node = Node(max(self.nodes, key=lambda x: x.id)+1,
-                        NodeType.HIDDEN, activation)
         idx = random.randint(0, len(self.connections)-1)
         self.connections[idx].enabled = False
+        new_node = Node(max(self.nodes, key=lambda x: x.id)+1,
+                        NodeType.HIDDEN, activation)
         first_connection = Connection(self.connections[idx].in_node, new_node, 1)
         weight = self.connections[idx].weight
         second_connection = Connection(new_node, self.connections[idx].out_node, weight)
@@ -67,7 +68,7 @@ class Genome(object):
                 value += inputs[node.id]
             for connection in node.inputs:
                 if connection.enabled:
-                    if connection.in_node.depth >= node.depth:
+                    if (connection.in_node.depth >= node.depth):
                         if connection.in_node.old_value is not None:
                             value += connection.in_node.old_value * connection.weight
                     else:
@@ -156,7 +157,8 @@ def crossover(genome_1:Genome, genome_2:Genome, disable_rate: float = 0.75) -> G
                                 nodes[nodes_dict[out_node]],
                                 connection.weight)
         connections.append(connection)
-    return Genome(nodes, connections)
+        new_genome = Genome(nodes, connections)
+    return new_genome
 
 def draw_genome(genome: Genome,
                 node_radius: float = 0.05,

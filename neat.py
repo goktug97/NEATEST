@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import random
 import copy
-from typing import Union, List, Callable
+from typing import Union, List, Callable, Tuple
 from itertools import groupby
 import functools
 import math
@@ -11,9 +11,21 @@ from genome import Genome
 from node import Node, NodeType
 from connection import Connection
 
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
 
 def steepened_sigmoid(x):
     return 1 / (1 + math.exp(-4.9 * x))
+
+def relu(x):
+    return max(x, 0)
+
+def leaky_relu(x):
+    return max(0.1*x, x)
+
+def tanh(x):
+    e_2x = exp(2*x)
+    return (e_2x - 1) / (e_2x + 1)
 
 
 class ContextGenome(Genome):
@@ -77,6 +89,8 @@ class NEAT(object):
                  interspecies_mating_rate: float = 0.001,
                  disable_rate: float = 0.75,
                  stegnant_threshold: int = 15,
+                 random_range: Tuple[float, float] = (-1.0, 1.0),
+                 noise_magnitude: float = 0.1,
                  input_activation: Callable[[float], float]=steepened_sigmoid,
                  hidden_activation: Callable[[float], float]=steepened_sigmoid,
                  output_activation: Callable[[float], float]=steepened_sigmoid):
@@ -86,6 +100,8 @@ class NEAT(object):
         self.output_size = output_size
         self.bias = bias
         self.c1, self.c2, self.c3 = c1, c2, c3
+        self.random_range = random_range
+        self.noise_magnitude = noise_magnitude
         self.distance_threshold = distance_threshold
         self.disable_rate = disable_rate
         self.weight_mutation_rate = weight_mutation_rate
@@ -118,8 +134,9 @@ class NEAT(object):
             for j in range(self.output_size):
                 output_node = output_nodes[j]
                 connections += [Connection(input_node, output_node,
-                                           random.uniform(-1.0, 1.0))]
+                                           random.uniform(*self.random_range))]
         return ContextGenome(input_nodes+output_nodes, connections)
+                             
 
     def create_population(self) -> None:
         population: List[ContextGenome] = []
@@ -179,11 +196,11 @@ class NEAT(object):
             genome_2 = self.get_random_genome(species)
             new_genome = genome_1.crossover(genome_2)
             if random.random() < self.weight_mutation_rate:
-                new_genome.weight_mutation()
+                new_genome.weight_mutation(self.noise_magnitude, self.random_range)
             if random.random() < self.node_mutation_rate:
                 new_genome.add_node_mutation(activation = self.hidden_activation)
             if random.random() < self.connection_mutation_rate:
-                new_genome.add_connection_mutation()
+                new_genome.add_connection_mutation(self.random_range)
             new_genome.generation = self.generation
             population.append(new_genome)
 
@@ -221,124 +238,3 @@ class NEAT(object):
                 return genome
             upto += genome.fitness
         assert False
-
-
-if __name__ == '__main__':
-    # TESTING
-    import matplotlib.pyplot as plt
-    import snake
-    import numpy as np
-    import cv2
-
-    # Settings
-    SEED = 123
-    VISION_RADIUS = 2
-    MAP_SIZE = 6 # Size of the map including walls
-    SNAKE_SIZE = 3 # Starting size
-    INPUT_SIZE = (VISION_RADIUS * 2 + 1) ** 2 - 2
-    N_NETWORKS = 200
-    BEST_PERCENT = 0.1
-    PLAYBACK = True
-
-    np.random.seed(SEED)
-    random.seed(SEED)
-
-    assert SNAKE_SIZE >= MAP_SIZE-3
-
-    OUTPUT_SIZE = 3 # If you change this you have to change L139
-    ACTIONS = [-1, 0, 1] # Left, Straight, Right
-
-    snake_ai = NEAT(n_networks = N_NETWORKS,
-                    input_size = INPUT_SIZE,
-                    output_size = OUTPUT_SIZE,
-                    bias = True,
-                    c1 = 1.0, c2 = 1.0, c3 = 0.4,
-                    distance_threshold = 3.0,
-                    weight_mutation_rate = 0.8,
-                    node_mutation_rate = 0.03,
-                    connection_mutation_rate = 0.05,
-                    interspecies_mating_rate = 0.001,
-                    disable_rate = 0.75,
-                    stegnant_threshold = 15,
-                    input_activation = steepened_sigmoid,
-                    hidden_activation = steepened_sigmoid,
-                    output_activation = steepened_sigmoid)
-
-    while True:
-        game = snake.Game(MAP_SIZE, SNAKE_SIZE)
-        best_fitness = -float('Inf')
-        for genome in snake_ai.population:
-            new_game = copy.deepcopy(game)
-            length = len(new_game.snake.body)
-            playback = []
-            step = 0
-            while not new_game.done:
-                screen = new_game.draw(50)
-                playback.append(screen)
-
-                game_map = new_game.map.copy()
-                game_map[new_game.apple[1], new_game.apple[0]] = -1
-                body = np.array(new_game.snake.body)
-                game_map = np.pad(game_map, ((VISION_RADIUS-1, VISION_RADIUS-1), 
-                                   (VISION_RADIUS-1, VISION_RADIUS-1)),
-                             constant_values=1)
-                vision = game_map[
-                    new_game.snake.head[1]-1:
-                    new_game.snake.head[1]+2*VISION_RADIUS,
-                    new_game.snake.head[0]-1:
-                    new_game.snake.head[0]+2*VISION_RADIUS]
-
-                if new_game.snake.x_direction == -1:
-                    vision = np.fliplr(vision)
-                    vision = np.flipud(vision)
-                if new_game.snake.y_direction == -1:
-                    vision = vision.T
-                    vision = np.fliplr(vision)
-                if new_game.snake.y_direction == 1:
-                    vision = vision.T
-                    vision = np.flipud(vision)
-
-                vision = vision.flatten()
-
-                vision = np.delete(vision, (VISION_RADIUS * 2 + 1) *
-                                   VISION_RADIUS + VISION_RADIUS - 1)
-                vision = np.delete(vision, (VISION_RADIUS * 2 + 1) *
-                                   VISION_RADIUS + VISION_RADIUS - 1)
-
-                input = np.concatenate([vision, [1]])
-
-                output = genome(input)
-
-                action = ACTIONS[np.argmax(output)]
-                new_game.step(action)
-
-                if len(new_game.snake.body) != length:
-                    step = 0
-                    length = len(new_game.snake.body)
-                else:
-                    step += 1
-                if step > MAP_SIZE ** 2:
-                    break
-            score = len(new_game.snake.body)
-            genome.fitness = score
-            if score > best_fitness:
-                if new_game.won:
-                    screen = new_game.draw(50)
-                    playback.append(screen)
-                best_genome = genome
-                best_game = playback
-                best_fitness = score
-        plt.cla()
-        best_genome.draw(node_radius=2.0, vertical_distance = 5.0,
-                         horizontal_distance = 50.0)
-        plt.draw()
-        plt.pause(0.001)
-
-        if PLAYBACK:
-            for screen in best_game:
-                cv2.imshow('cvwindow', screen)
-                key = cv2.waitKey(200)
-                if key == 27:
-                    break
-
-        snake_ai.next_generation()
