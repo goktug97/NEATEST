@@ -111,41 +111,32 @@ def distance(genome_1: Genome, genome_2: Genome,
     N = (1 if (genome_1.size < 20 and genome_2.size < 20)
          else max(genome_1.size, genome_2.size))
     N = 1
-    connections_1: Any = copy.deepcopy(genome_1.connections)
-    connections_2: Any = copy.deepcopy(genome_2.connections)
     _, _, disjoint, excess, avarage_weight_difference = allign_connections(
-        connections_1, connections_2)
+        genome_1.connections, genome_2.connections)
     return excess*c1/N + disjoint*c2/N + avarage_weight_difference*c3
 
 def crossover(genome_1:Genome, genome_2:Genome, disable_rate: float = 0.75) -> Genome:
     '''Crossover two genomes by aligning their innovation numbers.'''
     connections: List[Connection] = []
     nodes: List[Node] = []
-    connections_1: Any = copy.deepcopy(genome_1.connections)
-    connections_2: Any = copy.deepcopy(genome_2.connections)
     connections_1, connections_2, _, _, _ = allign_connections(
-        connections_1, connections_2)
+        genome_1.connections, genome_2.connections)
 
     for idx in range(len(connections_1)):
         connection_1 = connections_1[idx]
         connection_2 = connections_2[idx]
-        if connection_1 is None:
-            connection = connection_2.copy()
-            if not connection_2.enabled:
-                connection.enabled = random.random() > disable_rate
-        elif connection_2 is None:
-            connection = connection_1.copy()
-            if not connection_1.enabled:
-                connection.enabled = random.random() > disable_rate
+        if connection_1.dummy:
+            connection = connection_2
+        elif connection_2.dummy:
+            connection = connection_1
         else:
-            connection = random.choice([connection_1, connection_2]).copy()
-            if not (connection_1.enabled and connection_2.enabled):
-                connection.enabled = random.random() > disable_rate
+            connection = random.choice([connection_1, connection_2])
+
         in_node = Node(connection.in_node.id, connection.in_node.type,
                        connection.in_node.activation)
         out_node = Node(connection.out_node.id, connection.out_node.type,
                        connection.out_node.activation)
-
+                
         nodes_dict = dict(zip(nodes, range(len(nodes))))
         if in_node not in nodes_dict:
             nodes.append(in_node)
@@ -156,8 +147,10 @@ def crossover(genome_1:Genome, genome_2:Genome, disable_rate: float = 0.75) -> G
         connection = Connection(nodes[nodes_dict[in_node]],
                                 nodes[nodes_dict[out_node]],
                                 connection.weight)
+        if not (connection_1.enabled and connection_2.enabled):
+            connection.enabled = random.random() > disable_rate
         connections.append(connection)
-        new_genome = Genome(nodes, connections)
+    new_genome = Genome(nodes, connections)
     return new_genome
 
 def draw_genome(genome: Genome,
