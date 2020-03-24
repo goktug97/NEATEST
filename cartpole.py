@@ -5,17 +5,18 @@ import matplotlib.pyplot as plt
 
 import neat
 
-cartpole_ai = neat.NEAT(n_networks = 1000,
+cartpole_ai = neat.NEAT(n_networks = 200,
                         input_size = 4,
                         output_size = 1,
                         bias = True,
-                        c1 = 1.0, c2 = 1.0, c3 = 3.0,
+                        c1 = 1.0, c2 = 1.0, c3 = 0.4,
                         distance_threshold = 4.0,
                         weight_mutation_rate = 0.8,
                         node_mutation_rate = 0.03,
-                        connection_mutation_rate = 0.3,
+                        connection_mutation_rate = 0.05,
                         interspecies_mating_rate = 0.001,
                         disable_rate = 0.75,
+                        noise_magnitude = 0.01,
                         stegnant_threshold = 15,
                         input_activation = neat.steepened_sigmoid,
                         hidden_activation = neat.steepened_sigmoid,

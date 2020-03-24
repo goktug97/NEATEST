@@ -24,7 +24,7 @@ def leaky_relu(x):
     return max(0.1*x, x)
 
 def tanh(x):
-    e_2x = exp(2*x)
+    e_2x = math.exp(2*x)
     return (e_2x - 1) / (e_2x + 1)
 
 
