@@ -17,9 +17,6 @@ class Genome(object):
         self.output_size = len(grouped_nodes[-1])
         self.outputs = grouped_nodes[-1]
 
-        for node in self.nodes:
-            node.update_depth()
-
     def weight_mutation(self, magnitude: float,
                         random_range: Tuple[float, float]) -> None:
         '''Apply weight mutation to connection weights.'''
@@ -47,8 +44,6 @@ class Genome(object):
                 return
             connection = Connection(in_node, out_node, random.uniform(*random_range))
             self.connections.append(connection)
-            for node in self.nodes:
-                node.update_depth()
         _add_connection_mutation()
 
     def add_node_mutation(self,
@@ -63,9 +58,9 @@ class Genome(object):
         second_connection = Connection(new_node, self.connections[idx].out_node, weight)
         self.connections.append(first_connection)
         self.connections.append(second_connection)
+        new_node.depth = (first_connection.in_node.depth +
+                          second_connection.out_node.depth) / 2
         self.nodes.append(new_node)
-        for node in self.nodes:
-            node.update_depth()
 
     def __call__(self, inputs: List[float]) -> List[float]:
         self.nodes.sort(key=lambda x: x.depth)
@@ -140,9 +135,11 @@ def crossover(genome_1:Genome, genome_2:Genome, disable_rate: float = 0.75) -> G
             connection = random.choice([connection_1, connection_2])
 
         in_node = Node(connection.in_node.id, connection.in_node.type,
-                       connection.in_node.activation)
+                       connection.in_node.activation,
+                       depth = connection.in_node.depth)
         out_node = Node(connection.out_node.id, connection.out_node.type,
-                       connection.out_node.activation)
+                        connection.out_node.activation,
+                        depth = connection.out_node.depth)
                 
         nodes_dict = dict(zip(nodes, range(len(nodes))))
         if in_node not in nodes_dict:

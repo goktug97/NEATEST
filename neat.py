@@ -122,12 +122,14 @@ class NEAT(object):
     def random_genome(self) -> ContextGenome:
         '''Create fc neural network without hidden layers with random weights.'''
         connections: List[Connection] = []
-        input_nodes = [Node(i, NodeType.INPUT, self.input_activation)
+        input_nodes = [Node(i, NodeType.INPUT, self.input_activation,
+                            depth = 0.0)
                        for i in range(self.input_size)]
         if self.bias:
-            input_nodes.append(Node(self.input_size, NodeType.BIAS, value=1.0))
+            input_nodes.append(Node(self.input_size, NodeType.BIAS, value = 1.0,
+                                    depth = 0.0))
         output_nodes = [Node(i+len(input_nodes), NodeType.OUTPUT,
-                             self.output_activation)
+                             self.output_activation, depth = 1.0)
                         for i in range(self.output_size)]
         for i in range(len(input_nodes)):
             input_node = input_nodes[i]
