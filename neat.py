@@ -145,8 +145,11 @@ class NEAT(object):
         self.population = population
 
     def update_species(self):
-        for species in self.species:
-            species.reset()
+        for idx in reversed(range(len(self.species))):
+            if not len(self.species[idx].genomes):
+                self.species.pop(idx)
+            else:
+                self.species[idx].reset()
         for genome in self.population:
             known = False
             for species in self.species:
@@ -161,11 +164,6 @@ class NEAT(object):
                 new_species = Species(genome)
                 self.species.append(new_species)
                 genome.species = new_species
-
-        # Remove if a species is empty
-        for idx in reversed(range(len(self.species))):
-            if not len(self.species[idx].genomes):
-                self.species.pop(idx)
 
     def next_generation(self):
         self.update_species()
