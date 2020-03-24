@@ -37,7 +37,10 @@ class Genome(object):
             out_idx = random.randint(0, len(self.nodes) - 1)
             out_node = self.nodes[out_idx]
             connection = Connection(in_node, out_node, dummy=True)
-            if connection in out_node.inputs or out_node.type == NodeType.BIAS:
+            if (connection in out_node.inputs or
+                out_node.type == NodeType.BIAS or
+                out_node.type == NodeType.INPUT or
+                in_node.type == NodeType.OUTPUT):
                 if depth > 20:
                     return
                 _add_connection_mutation(depth+1)
