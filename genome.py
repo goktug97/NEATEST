@@ -112,7 +112,8 @@ def distance(genome_1: Genome, genome_2: Genome,
              c1: float, c2: float, c3: float) -> float:
     # N = (1 if (genome_1.size < 20 and genome_2.size < 20)
     #      else max(genome_1.size, genome_2.size))
-    N = 1
+    N = max(genome_1.size, genome_2.size)
+    # N = 1
     _, _, disjoint, excess, avarage_weight_difference = allign_connections(
         genome_1.connections, genome_2.connections)
     return excess*c1/N + disjoint*c2/N + avarage_weight_difference*c3
