@@ -11,6 +11,7 @@ from genome import Genome
 from node import Node, NodeType
 from connection import Connection
 
+
 def sigmoid(x):
     return 1 / (1 + math.exp(-x))
 
