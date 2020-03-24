@@ -10,6 +10,8 @@ Above gif was pure luck and it is from an earlier version which allows connectio
 ## Requirements
 * Python >= 3.6
 
+<img src="https://github.com/goktug97/NEAT/raw/master/cartpole.gif?raw=true" align="right" width="300" alt="cartpole"/>
+
 ### Optional
 * Matplotlib (To draw genomes)
 * gym (cartpole.py)

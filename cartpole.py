@@ -28,6 +28,7 @@ while True:
         total_reward = 0
         for _ in range(N_PLAYS):
             observation = env.reset()
+            env._max_episode_steps = 500
             done = False
             while not done:
                 output  = genome(observation)
@@ -44,10 +45,11 @@ while True:
     best_genome.draw()
     plt.draw()
     plt.pause(0.001)
-    if best_genome.fitness == 200:
+    if best_genome.fitness == 500:
         break
     cartpole_ai.next_generation()
 
+env = gym.wrappers.Monitor(env, '.', force = True)
 observation = env.reset()
 env._max_episode_steps = 500
 done = False
@@ -59,6 +61,5 @@ while not done:
     env.render()
     total_reward += reward
 print(total_reward)
-
 env.close()
 

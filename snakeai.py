@@ -22,10 +22,7 @@ snake_ai = neat.NEAT(n_networks = 300,
                      connection_mutation_rate = 0.5,
                      interspecies_mating_rate = 0.001,
                      disable_rate = 0.75,
-                     stegnant_threshold = 15,
-                     input_activation = neat.steepened_sigmoid,
-                     hidden_activation = neat.steepened_sigmoid,
-                     output_activation = neat.steepened_sigmoid)
+                     stegnant_threshold = 15)
 
 snake_game = snake.Game(MAP_SIZE, 3)
 ACTIONS = [-1, 0, 1]
