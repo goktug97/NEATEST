@@ -217,25 +217,41 @@ class NEAT(object):
         if len(self.species) == 1:
             return self.species[0]
         total = 0.0
+        length = 0
+        min_fitness = float('inf')
         for species in self.species:
-            if species.stegnant < self.stegnant_threshold:
+            if species.stegnant < self.stegnant_threshold and len(species.genomes):
+                length += 1
                 total += species.total_adjusted_fitness
-        r = random.uniform(0, total)
+                if species.total_adjusted_fitness < min_fitness:
+                    min_fitness = species.total_adjusted_fitness
+        total += length * (-min_fitness + 0.1)
+        r = random.random()
         upto = 0.0
         for species in self.species:
-            if species.stegnant < self.stegnant_threshold:
-                if upto + species.total_adjusted_fitness >= r:
+            if species.stegnant < self.stegnant_threshold and len(species.genomes):
+                score = (species.total_adjusted_fitness - min_fitness + 0.1) / total
+                upto += score
+                if upto >= r:
                     return species
-                upto += species.total_adjusted_fitness
         assert False
 
     @staticmethod
     def get_random_genome(species: Species) -> ContextGenome:
-        total = sum(genome.fitness for genome in species.genomes)
-        r = random.uniform(0, total)
+        if len(species.genomes) == 1:
+            return species.genomes[0]
+        min_fitness = float('inf')
+        total = 0.0
+        for genome in species.genomes:
+            if genome.fitness < min_fitness:
+                min_fitness = genome.fitness
+            total += genome.fitness
+        total += len(species.genomes) * (-min_fitness + 0.1)
+        r = random.random()
         upto = 0.0
         for genome in species.genomes:
-            if upto + genome.fitness >= r:
+            score = (genome.fitness - min_fitness + 0.1) / total
+            upto += score
+            if upto >= r:
                 return genome
-            upto += genome.fitness
         assert False

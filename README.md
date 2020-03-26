@@ -15,9 +15,9 @@ Above gif was pure luck and it is from an earlier version which allows connectio
 ### Optional
 * Matplotlib (To draw genomes)
 * gym (cartpole.py)
-* [snake](https://github.com/goktug/PythonSnake) (snake.py)
-* numpy (snake.py)
-* cv2 (snake.py)
+* [snake](https://github.com/goktug/PythonSnake) (snakeai.py)
+* numpy (snakeai.py)
+* cv2 (snakeai.py)
 
 ### Install
 
