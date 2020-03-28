@@ -148,11 +148,9 @@ class NEAT(object):
         self.population = population
 
     def update_species(self):
-        for idx in reversed(range(len(self.species))):
-            if not len(self.species[idx].genomes):
-                self.species.pop(idx)
-            else:
-                self.species[idx].reset()
+        for species in self.species:
+            species.reset()
+
         for genome in self.population:
             known = False
             for species in self.species:
@@ -170,6 +168,17 @@ class NEAT(object):
 
     def next_generation(self):
         self.update_species()
+
+        # Remove the worst from each species and delete empty species
+        for idx in reversed(range(len(self.species))):
+            species = self.species[idx]
+            if len(species.genomes):
+                # Species are sorted by fitness scores in reverse
+                species.genomes.sort(key = lambda x: x.fitness, reverse=True)
+                species.genomes.pop()
+            if not len(species.genomes):
+                self.species.pop(idx)
+                
         self.adjust_fitness_scores()
 
         population: List[ContextGenome] = []
@@ -208,10 +217,10 @@ class NEAT(object):
         self.population = population
 
     def adjust_fitness_scores(self) -> None:
-        for genome in self.population:
-            genome.fitness = genome.fitness / len(genome.species.genomes)
-            genome.species.total_adjusted_fitness += genome.fitness
-
+        for species in self.species:
+            for genome in species.genomes:
+                genome.fitness = genome.fitness / len(species.genomes)
+                species.total_adjusted_fitness += genome.fitness
 
     def get_random_species(self) -> Species:
         if len(self.species) == 1:
@@ -220,7 +229,7 @@ class NEAT(object):
         length = 0
         min_fitness = float('inf')
         for species in self.species:
-            if species.stegnant < self.stegnant_threshold and len(species.genomes):
+            if species.stegnant < self.stegnant_threshold:
                 length += 1
                 total += species.total_adjusted_fitness
                 if species.total_adjusted_fitness < min_fitness:
@@ -229,7 +238,7 @@ class NEAT(object):
         r = random.random()
         upto = 0.0
         for species in self.species:
-            if species.stegnant < self.stegnant_threshold and len(species.genomes):
+            if species.stegnant < self.stegnant_threshold:
                 score = (species.total_adjusted_fitness - min_fitness + 0.1) / total
                 upto += score
                 if upto >= r:
@@ -240,12 +249,9 @@ class NEAT(object):
     def get_random_genome(species: Species) -> ContextGenome:
         if len(species.genomes) == 1:
             return species.genomes[0]
-        min_fitness = float('inf')
-        total = 0.0
-        for genome in species.genomes:
-            if genome.fitness < min_fitness:
-                min_fitness = genome.fitness
-            total += genome.fitness
+        # Assume genomes are sorted by fitness, max first
+        min_fitness = species.genomes[-1].fitness
+        total = species.total_adjusted_fitness
         total += len(species.genomes) * (-min_fitness + 0.1)
         r = random.random()
         upto = 0.0
