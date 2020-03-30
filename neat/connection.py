@@ -3,7 +3,7 @@ from typing import List, Union, Tuple, Dict
 import statistics
 from itertools import chain, repeat, islice 
 
-from node import Node, NodeType
+from .node import Node, NodeType
 
 
 def pad_list(iterable, size, padding=None):

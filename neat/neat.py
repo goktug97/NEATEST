@@ -7,9 +7,9 @@ import functools
 import math
 import statistics
 
-from genome import Genome
-from node import Node, NodeType
-from connection import Connection
+from .genome import Genome
+from .node import Node, NodeType
+from .connection import Connection
 
 
 def sigmoid(x):

@@ -3,8 +3,8 @@ import math
 import copy
 import random
 
-from connection import Connection, allign_connections
-from node import Node, NodeType, group_nodes_by_depth, group_nodes_by_type
+from .connection import Connection, allign_connections
+from .node import Node, NodeType, group_nodes_by_depth, group_nodes_by_type
 
 
 class Genome(object):

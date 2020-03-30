@@ -18,8 +18,7 @@ setup(name='NEAT',
       url='https://github.com/goktug97/NEAT',
       download_url=(
           'https://github.com/goktug97/NEAT/archive/v0.0.1.tar.gz'),
-      py_modules=[os.path.splitext(os.path.basename(path))[0]
-                  for path in ['neat.py', 'genome.py', 'connection.py', 'node.py']],
+      packages = ['neat'],
       classifiers=[
           "Programming Language :: Python :: 3",
           "License :: OSI Approved :: MIT License",

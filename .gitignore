@@ -4,3 +4,6 @@ __pycache__
 build
 dist
 *egg-info
+*.json
+*.mp4
+test.py

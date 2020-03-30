@@ -30,7 +30,7 @@ class Node(object):
         self.visited = False
 
         if TYPE_CHECKING:
-            from connection import Connection
+            from .connection import Connection
         self.inputs: List[Connection] = []
 
     @property

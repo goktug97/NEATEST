@@ -34,7 +34,7 @@ python3 setup.py install --user
 3) [Update genome fitness](https://github.com/goktug97/NEAT/blob/314795bca9db096b2cea31e301646b90b72b784d/xor.py#L35)
 4) [Generate next generation](https://github.com/goktug97/NEAT/blob/314795bca9db096b2cea31e301646b90b72b784d/xor.py#L41)
 
-[xor.py](https://github.com/goktug97/NEAT/blob/master/xor.py)
+[xor.py](https://github.com/goktug97/NEAT/blob/master/examples/xor.py)
 
 ```python
 import neat
@@ -80,8 +80,8 @@ genome.draw()
 plt.show()
 ```
 
-* [Gym Cartpole Example](https://github.com/goktug97/NEAT/blob/master/cartpole.py)
-* [Snake Example](https://github.com/goktug97/NEAT/blob/master/snakeai.py)
+* [Gym Cartpole Example](https://github.com/goktug97/NEAT/blob/master/examples/cartpole.py)
+* [Snake Example](https://github.com/goktug97/NEAT/blob/master/examples/snakeai.py)
 
 
 ## References
