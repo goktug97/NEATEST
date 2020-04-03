@@ -4,6 +4,8 @@ from typing import Callable, Union, List, TYPE_CHECKING
 import copy
 from enum import Enum
 
+def passthrough(x):
+    return x
 
 @functools.total_ordering
 class NodeType(Enum):
@@ -18,7 +20,7 @@ class NodeType(Enum):
 
 class Node(object):
     def __init__(self, id: int, type: NodeType,
-                 activation: Callable[[float], float] = lambda x: x,
+                 activation: Callable[[float], float] = passthrough,
                  value: Union[float, None] = None,
                  depth: float = 0.0):
         self.id = id

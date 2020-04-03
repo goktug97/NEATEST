@@ -22,8 +22,9 @@ cartpole_ai = neat.NEAT(n_networks = 150,
                         stegnant_threshold = float('inf'))
 
 N_PLAYS = 12
-max_fitness = -float('inf')
 while True:
+    rewards = [] 
+    print(f'Generation: {cartpole_ai.generation}')
     for genome in cartpole_ai.population:
         total_reward = 0
         for _ in range(N_PLAYS):
@@ -36,18 +37,18 @@ while True:
                 observation, reward, done, info = env.step(output)
                 total_reward += reward
         total_reward = total_reward / N_PLAYS
-        if total_reward > max_fitness:
-            max_fitness = total_reward
-            best_genome = genome
-        genome.fitness = total_reward
-    print(f'Generation: {cartpole_ai.generation}, Max Fitness: {max_fitness}')
+        rewards.append(total_reward)
+    cartpole_ai.next_generation(rewards)
+    print(f'Max Reward Session: {cartpole_ai.best_fitness}')
+    print(f'Max Reward Step: {max(rewards)}')
+
     plt.cla()
-    best_genome.draw()
+    cartpole_ai.best_genome.draw()
     plt.draw()
     plt.pause(0.001)
-    if best_genome.fitness == 500:
+
+    if cartpole_ai.best_fitness == 500:
         break
-    cartpole_ai.next_generation()
 
 env = gym.wrappers.Monitor(env, '.', force = True)
 observation = env.reset()
@@ -55,7 +56,7 @@ env._max_episode_steps = 500
 done = False
 total_reward = 0
 while not done:
-    output  = best_genome(observation)
+    output  = cartpole_ai.best_genome(observation)
     output = max(range(len(output)), key=lambda x: output[x])
     observation, reward, done, info = env.step(output)
     env.render()

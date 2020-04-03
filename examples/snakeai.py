@@ -28,7 +28,7 @@ snake_game = snake.Game(MAP_SIZE, 3)
 ACTIONS = [-1, 0, 1]
 
 while True:
-    best_fitness = -float('inf')
+    rewards = []
     for genome in snake_ai.population:
         snake_game.reset()
         length = len(snake_game.snake.body)
@@ -78,16 +78,14 @@ while True:
             score = score ** 2
         elif snake_game.done:
             score -= 1
-        genome.fitness = score
-        if genome.fitness > best_fitness:
-            best_fitness = genome.fitness
+        rewards.append(score)
+        if genome.fitness > snake_ai.best_fitness:
             best_game = playback
-            best_genome = genome
 
-    snake_ai.next_generation()
+    snake_ai.next_generation(rewards)
 
     plt.cla()
-    best_genome.draw(horizontal_distance=5.0)
+    snake_ai.best_genome.draw(horizontal_distance=5.0)
     plt.draw()
     plt.pause(0.001)
 

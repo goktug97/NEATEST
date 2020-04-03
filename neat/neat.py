@@ -6,6 +6,7 @@ from itertools import groupby
 import functools
 import math
 import statistics
+import pickle
 
 from .genome import Genome
 from .node import Node, NodeType
@@ -25,8 +26,7 @@ def leaky_relu(x):
     return max(0.1*x, x)
 
 def tanh(x):
-    e_2x = math.exp(2*x)
-    return (e_2x - 1) / (e_2x + 1)
+    return math.tanh(x)
 
 
 class ContextGenome(Genome):
@@ -68,7 +68,6 @@ class Species(object):
         self.representer = random.choice(self.genomes)
         self.genomes = []
 
-
     @classmethod
     def assign_id(cls):
         cls.id += 1
@@ -79,6 +78,7 @@ class Species(object):
 
     def __gt__(self, other):
         return self.id > other.id
+
 
 class NEAT(object):
     def __init__(self, n_networks: int, input_size: int, output_size: int,
@@ -115,6 +115,8 @@ class NEAT(object):
         self.output_activation = output_activation
 
         self.generation = 0
+        self.best_fitness: float = -float('inf')
+        self.best_genome: ContextGenome
 
         self.create_population()
         self.species = [Species(random.choice(self.population))]
@@ -166,7 +168,13 @@ class NEAT(object):
                 self.species.append(new_species)
                 genome.species = new_species
 
-    def next_generation(self):
+    def next_generation(self, rewards : List[float]):
+        for idx, reward in enumerate(rewards):
+            self.population[idx].fitness = reward
+            if reward > self.best_fitness:
+                self.best_fitness = reward
+                self.best_genome = self.population[idx]
+
         self.update_species()
 
         # Remove the worst from each species and delete empty species
@@ -261,3 +269,28 @@ class NEAT(object):
             if upto >= r:
                 return genome
         assert False
+
+    def save_checkpoint(self):
+        import time
+        import pathlib
+        import os
+        import inspect
+        frame = inspect.stack()[1]
+        module = inspect.getmodule(frame[0])
+        folder = pathlib.Path(
+            f"{os.path.join(os.path.dirname(module.__file__), 'checkpoints')}")
+        folder.mkdir(parents=True, exist_ok=True)
+        filename = f'{int(time.time())}.checkpoint'
+        save_path = os.path.abspath(os.path.join(folder, filename))
+        print(f'Saving checkpoint: {save_path}')
+        with open(os.path.join(folder, filename), 'wb') as output:
+            pickle.dump(self.__dict__, output, -1)
+
+    @classmethod
+    def load_checkpoint(cls, filename):
+        with open(filename, 'rb') as checkpoint:
+            cls_dict = pickle.load(checkpoint)
+        neat = cls.__new__(cls)
+        neat.__dict__.update(cls_dict)
+        return neat
+

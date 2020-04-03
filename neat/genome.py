@@ -2,6 +2,7 @@ from typing import List, Any, Callable, Tuple
 import math
 import copy
 import random
+import pickle
 
 from .connection import Connection, allign_connections
 from .node import Node, NodeType, group_nodes_by_depth, group_nodes_by_type
@@ -97,6 +98,18 @@ class Genome(object):
     def distance(self, other: 'Genome',
                  c1: float, c2: float, c3: float) -> float:
         return distance(self, other, c1, c2, c3)
+
+    def save(self, filename: str) -> None:
+        with open(filename, 'wb') as output:
+            pickle.dump(self.__dict__, output, -1)
+
+    @classmethod
+    def load(cls, filename: str) -> 'Genome':
+        with open(filename, 'rb') as genome:
+            genome_dict = pickle.load(genome)
+        genome = cls.__new__(cls)
+        genome.__dict__.update(genome_dict)
+        return genome
 
     def __str__(self):
         string = ''

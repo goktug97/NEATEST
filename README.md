@@ -10,14 +10,17 @@ Above gif was pure luck and it is from an earlier version which allows connectio
 ## Requirements
 * Python >= 3.6
 
-<img src="https://github.com/goktug97/NEAT/raw/master/cartpole.gif?raw=true" align="right" width="300" alt="cartpole"/>
-
 ### Optional
 * Matplotlib (To draw genomes)
-* gym (cartpole.py)
-* [snake](https://github.com/goktug/PythonSnake) (snakeai.py)
-* numpy (snakeai.py)
-* cv2 (snakeai.py)
+
+#### Gym Examples
+* gym
+* mpi4py (Parallel NEAT Example)
+
+#### Snake Example
+* [snake](https://github.com/goktug/PythonSnake)
+* numpy
+* cv2
 
 ### Install
 
@@ -28,11 +31,6 @@ python3 setup.py install --user
 ```
 
 ### Usage
-
-1) [Set up the NEAT](https://github.com/goktug97/NEAT/blob/314795bca9db096b2cea31e301646b90b72b784d/xor.py#L7-L21)
-2) [Loop through genomes](https://github.com/goktug97/NEAT/blob/314795bca9db096b2cea31e301646b90b72b784d/xor.py#L28)
-3) [Update genome fitness](https://github.com/goktug97/NEAT/blob/314795bca9db096b2cea31e301646b90b72b784d/xor.py#L35)
-4) [Generate next generation](https://github.com/goktug97/NEAT/blob/314795bca9db096b2cea31e301646b90b72b784d/xor.py#L41)
 
 [xor.py](https://github.com/goktug97/NEAT/blob/master/examples/xor.py)
 
@@ -60,6 +58,7 @@ solution_found = False
 
 while True:
     print(f'Generation: {xor.generation}')
+    rewards = []
     for genome in xor.population:
         error = 0
         for input_1 in range(len(truth_table)):
@@ -67,19 +66,20 @@ while True:
                 output = int(round(genome([input_1, input_2])[0]))
                 error += abs(truth_table[input_1][input_2] - output)
         fitness = (4 - error) ** 2
-        genome.fitness = fitness
+        rewards.append(fitness)
         if fitness == 16:
             solution_found = True
             break
     if solution_found:
         break
-    xor.next_generation()
+    xor.next_generation(rewards)
 
 import matplotlib.pyplot as plt
 genome.draw()
 plt.show()
 ```
 
+* [Parallel Bipedal Example](https://github.com/goktug97/NEAT/blob/master/examples/parallel_bipedal.py)
 * [Gym Cartpole Example](https://github.com/goktug97/NEAT/blob/master/examples/cartpole.py)
 * [Snake Example](https://github.com/goktug97/NEAT/blob/master/examples/snakeai.py)
 

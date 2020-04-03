@@ -25,6 +25,7 @@ solution_found = False
 
 while True:
     print(f'Generation: {xor.generation}')
+    rewards = []
     for genome in xor.population:
         error = 0
         for input_1 in range(len(truth_table)):
@@ -32,13 +33,13 @@ while True:
                 output = int(round(genome([input_1, input_2])[0]))
                 error += abs(truth_table[input_1][input_2] - output)
         fitness = (4 - error) ** 2
-        genome.fitness = fitness
+        rewards.append(fitness)
         if fitness == 16:
             solution_found = True
             break
     if solution_found:
         break
-    xor.next_generation()
+    xor.next_generation(rewards)
 
 import matplotlib.pyplot as plt
 genome.draw()

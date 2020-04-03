@@ -7,3 +7,5 @@ dist
 *.json
 *.mp4
 test.py
+checkpoints
+*.pickle
