@@ -105,9 +105,9 @@ class Genome(object):
 
     @classmethod
     def load(cls, filename: str) -> 'Genome':
-        with open(filename, 'rb') as genome:
-            genome_dict = pickle.load(genome)
-        genome = cls.__new__(cls)
+        with open(filename, 'rb') as f:
+            genome_dict = pickle.load(f)
+        genome: 'Genome' = cls.__new__(cls)
         genome.__dict__.update(genome_dict)
         return genome
 
@@ -165,8 +165,12 @@ def crossover(genome_1:Genome, genome_2:Genome, disable_rate: float = 0.75) -> G
         connection = Connection(nodes[nodes_dict[in_node]],
                                 nodes[nodes_dict[out_node]],
                                 connection.weight)
-        if not (connection_1.enabled and connection_2.enabled):
+        if connection_1.enabled and connection_2.enabled:
+            connection.enabled = True
+        elif connection_1.enabled ^ connection_2.enabled:
             connection.enabled = random.random() > disable_rate
+        else:
+            connection.enabled = False
         connections.append(connection)
     new_genome = Genome(nodes, connections)
     return new_genome
