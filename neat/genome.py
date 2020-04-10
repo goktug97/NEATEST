@@ -4,7 +4,7 @@ import copy
 import random
 import pickle
 
-from .connection import Connection, allign_connections
+from .connection import Connection, align_connections
 from .node import Node, NodeType, group_nodes_by_depth, group_nodes_by_type
 
 
@@ -35,7 +35,7 @@ class Genome(object):
             out_idx = random.randint(0, len(self.nodes) - 1)
             out_node = self.nodes[out_idx]
             connection = Connection(in_node, out_node, dummy=True)
-            if (connection in out_node.inputs or
+            if (connection in self.connections or
                 out_node.type == NodeType.BIAS or
                 out_node.type == NodeType.INPUT or
                 in_node.type == NodeType.OUTPUT):
@@ -127,7 +127,7 @@ def distance(genome_1: Genome, genome_2: Genome,
     #      else max(genome_1.size, genome_2.size))
     N = max(genome_1.size, genome_2.size)
     # N = 1
-    _, _, disjoint, excess, avarage_weight_difference = allign_connections(
+    _, _, disjoint, excess, avarage_weight_difference = align_connections(
         genome_1.connections, genome_2.connections)
     return excess*c1/N + disjoint*c2/N + avarage_weight_difference*c3
 
@@ -135,7 +135,7 @@ def crossover(genome_1:Genome, genome_2:Genome, disable_rate: float = 0.75) -> G
     '''Crossover two genomes by aligning their innovation numbers.'''
     connections: List[Connection] = []
     nodes: List[Node] = []
-    connections_1, connections_2, _, _, _ = allign_connections(
+    connections_1, connections_2, _, _, _ = align_connections(
         genome_1.connections, genome_2.connections)
 
     for idx in range(len(connections_1)):

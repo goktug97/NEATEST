@@ -1,7 +1,7 @@
 import copy
 from typing import List, Union, Tuple, Dict
 import statistics
-from itertools import chain, repeat, islice 
+from itertools import chain, repeat, islice
 
 from .node import Node, NodeType
 
@@ -9,10 +9,9 @@ from .node import Node, NodeType
 def pad_list(iterable, size, padding=None):
    return list(islice(chain(iterable, repeat(padding)), size))
 
-
 class Connection(object):
     connections: Dict['Connection', int] = {}
-    global_innovation: int = 0 
+    global_innovation: int = 0
 
     def __init__(self, in_node: Node, out_node: Node, weight: float = 1.0,
                  dummy: bool = False):
@@ -25,6 +24,9 @@ class Connection(object):
         self.innovation = Connection.register_connection(self)
 
         self.out_node.inputs.append(self)
+
+    def __gt__(self, other):
+        return self.innovation > other.innovation
 
     @classmethod
     def register_connection(cls, new_connection:'Connection') -> int:
@@ -43,7 +45,8 @@ class Connection(object):
             return ((self.in_node == other.in_node) and
                     (self.out_node == other.out_node))
         else:
-            raise ValueError(f'Value type should be Connection, got {type(other)}')
+           raise ValueError(f'Value type should be Connection, got {type(other)}')
+
 
     def copy(self):
         return copy.deepcopy(self)
@@ -51,39 +54,56 @@ class Connection(object):
     def __str__(self):
         string = f'{self.in_node.id} -> {self.out_node.id} '
         string = f'{string}Weight: {self.weight:.3f} '
-        string = f'{string}Innovation No: {self.innovation} '
+        if self.dummy:
+            string = f'{string}Innovation No: Dummy '
+        else:
+            string = f'{string}Innovation No: {self.innovation} '
         string = f'{string}Disabled: {not self.enabled} '
         return string
 
     def __repr__(self):
-        return str(self.innovation)
+        if self.dummy:
+            return 'Dummy'
+        else:
+            return str(self.innovation)
 
-def allign_connections(
+def align_connections(
         connections_1: List[Connection],
         connections_2: List[Connection]) -> Tuple[
             List[Connection],
             List[Connection],
             int, int, float]:
-    '''Destructively allign connections by their innovation number.'''
     dummy_node = Node(0, NodeType.HIDDEN)
     dummy_connection = Connection(dummy_node, dummy_node, dummy=True)
-    connections_1 = sorted(connections_1, key = lambda x: x.innovation)
-    connections_2 = sorted(connections_2, key = lambda x: x.innovation)
+    end = dummy_connection
+    iterators = [chain(i, [end]) for i in [sorted(connections_1),
+        sorted(connections_2)]]
+    values = [next(i) for i in iterators]
+    connections_1 = []
+    connections_2 = []
     weights = []
+    excess = 0
     disjoint = 0
-    for i in range(min(len(connections_1), len(connections_2))):
-        if connections_1[i].innovation > connections_2[i].innovation:
-            connections_1.insert(i, dummy_connection)
-            disjoint +=1
-        elif connections_1[i].innovation < connections_2[i].innovation:
-            connections_2.insert(i, dummy_connection)
-            disjoint +=1
-        else:
-            weights.append(abs(connections_1[i].weight - connections_2[i].weight))
-
+    while not all(v is end for v in values):
+        smallest = min(v for v in values if v is not end)
+        alignment = []
+        match = True
+        for v in values:
+            if v == smallest:
+                alignment.append(v)
+            else:
+                match = False
+                alignment.append(dummy_connection)
+                if values[0] is end or values[1] is end:
+                    excess += 1
+                else:
+                    disjoint += 1
+        connection_1, connection_2 = alignment
+        if match:
+            weights.append(abs(connection_1.weight - connection_2.weight))
+        connections_1.append(connection_1)
+        connections_2.append(connection_2)
+        values = [next(i) if v == smallest else v
+                  for i, v in zip(iterators, values)]
     avarage_weight_difference = statistics.mean(weights)
-    max_length = max(len(connections_1), len(connections_2))
-    excess = max_length - min(len(connections_1), len(connections_2))
-    connections_1 = pad_list(connections_1, max_length, padding=dummy_connection)
-    connections_2 = pad_list(connections_2, max_length, padding=dummy_connection)
     return connections_1, connections_2, disjoint, excess, avarage_weight_difference
