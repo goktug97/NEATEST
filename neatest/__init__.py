@@ -1,4 +1,4 @@
-from .neat import *
+from .neatest import *
 from .connection import *
 from .genome import *
 from .node import *

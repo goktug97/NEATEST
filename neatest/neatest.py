@@ -32,7 +32,6 @@ def tanh(x):
 class ContextGenome(Genome):
     '''Genome class that holds data which depends on the context.'''
     def __init__(self, nodes: List[Node], connections: List[Connection]):
-        self.species: Species
         self.fitness: float = 0.0
         self.generation: int = 0
         super().__init__(nodes, connections)
@@ -42,75 +41,30 @@ class ContextGenome(Genome):
         return ContextGenome(new_genome.nodes, new_genome.connections)
 
 
-@functools.total_ordering
-class Species(object):
-    id: int = 0
-    def __init__(self, representer: ContextGenome):
-        self.genomes: List[ContextGenome] = [representer]
-        self.representer: ContextGenome = representer
-        self.species_id: int = Species.assign_id()
-        self.max_fitness: float = representer.fitness
-        self.improved_generation: int = 0
-        self.total_adjusted_fitness: float = 0.0
-        self.stegnant: int = 0
-
-    def add_genome(self, genome: ContextGenome) -> None:
-        self.genomes.append(genome)
-        if genome.fitness > self.max_fitness:
-            self.stegnant = 0
-            self.improved_generation = genome.generation
-            self.max_fitness = genome.fitness
-        else:
-            self.stegnant = genome.generation - self.improved_generation
-
-    def reset(self) -> None:
-        self.total_adjusted_fitness = 0.0
-        self.representer = random.choice(self.genomes)
-        self.genomes = []
-
-    @classmethod
-    def assign_id(cls):
-        cls.id += 1
-        return cls.id
-
-    def __hash__(self):
-        return hash(str(Species.id))
-
-    def __gt__(self, other):
-        return self.id > other.id
-
-
-class NEAT(object):
+class NEATEST(object):
     def __init__(self, n_networks: int, input_size: int, output_size: int,
-                 bias: bool, c1: float, c2: float, c3: float,
-                 distance_threshold: float, 
-                 weight_mutation_rate: float,
+                 bias: bool,
                  node_mutation_rate: float,
                  connection_mutation_rate: float,
-                 interspecies_mating_rate: float = 0.001,
-                 disable_rate: float = 0.75,
+                 disable_connection_mutation_rate: float,
+                 dominant_gene_rate: float,
                  stegnant_threshold: int = 15,
-                 random_range: Tuple[float, float] = (-1.0, 1.0),
-                 noise_magnitude: float = 0.001,
-                 input_activation: Callable[[float], float]=steepened_sigmoid,
-                 hidden_activation: Callable[[float], float]=steepened_sigmoid,
-                 output_activation: Callable[[float], float]=steepened_sigmoid):
+                 elite_rate: float = 0.10,
+                 sigma: float = 0.1,
+                 hidden_activation: Callable[[float], float]=lambda x: x,
+                 output_activation: Callable[[float], float]=lambda x: x):
 
         self.n_networks = n_networks
         self.input_size = input_size
         self.output_size = output_size
         self.bias = bias
-        self.c1, self.c2, self.c3 = c1, c2, c3
-        self.random_range = random_range
-        self.noise_magnitude = noise_magnitude
-        self.distance_threshold = distance_threshold
-        self.disable_rate = disable_rate
-        self.weight_mutation_rate = weight_mutation_rate
-        self.interspecies_mating_rate = interspecies_mating_rate
+        self.sigma = sigma
+        self.elite_rate = elite_rate
+        self.disable_connection_mutation_rate = disable_connection_mutation_rate
         self.node_mutation_rate = node_mutation_rate
         self.connection_mutation_rate = connection_mutation_rate
+        self.dominant_gene_rate = dominant_gene_rate
         self.stegnant_threshold = stegnant_threshold
-        self.input_activation = input_activation
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
 
@@ -119,14 +73,11 @@ class NEAT(object):
         self.best_genome: ContextGenome
 
         self.create_population()
-        self.species = [Species(random.choice(self.population))]
-        self.update_species()
 
     def random_genome(self) -> ContextGenome:
         '''Create fc neural network without hidden layers with random weights.'''
         connections: List[Connection] = []
-        input_nodes = [Node(i, NodeType.INPUT, self.input_activation,
-                            depth = 0.0)
+        input_nodes = [Node(i, NodeType.INPUT, depth = 0.0)
                        for i in range(self.input_size)]
         if self.bias:
             input_nodes.append(Node(self.input_size, NodeType.BIAS, value = 1.0,
@@ -138,35 +89,17 @@ class NEAT(object):
             input_node = input_nodes[i]
             for j in range(self.output_size):
                 output_node = output_nodes[j]
-                connections += [Connection(input_node, output_node,
-                                           random.uniform(*self.random_range))]
+                connections += [Connection(in_node=input_node, out_node=output_node,
+                                           dominant_gene_rate=self.dominant_gene_rate,
+                                           weight=random.gauss(0.0, self.sigma))]
         return ContextGenome(input_nodes+output_nodes, connections)
-                             
+
 
     def create_population(self) -> None:
         population: List[ContextGenome] = []
         for _ in range(self.n_networks):
             population.append(self.random_genome())
         self.population = population
-
-    def update_species(self):
-        for species in self.species:
-            species.reset()
-
-        for genome in self.population:
-            known = False
-            for species in self.species:
-                if genome.distance(
-                        species.representer,
-                        self.c1, self.c2, self.c3) < self.distance_threshold:
-                    species.add_genome(genome)
-                    genome.species = species
-                    known = True
-                    break
-            if not known: 
-                new_species = Species(genome)
-                self.species.append(new_species)
-                genome.species = new_species
 
     def next_generation(self, rewards : List[float]):
         for idx, reward in enumerate(rewards):
@@ -175,95 +108,46 @@ class NEAT(object):
                 self.best_fitness = reward
                 self.best_genome = self.population[idx]
 
-        self.update_species()
 
-        # Remove the worst from each species and delete empty species
-        for idx in reversed(range(len(self.species))):
-            species = self.species[idx]
-            if len(species.genomes):
-                # Species are sorted by fitness scores in reverse
-                species.genomes.sort(key = lambda x: x.fitness, reverse=True)
-                species.genomes.pop()
-            if not len(species.genomes):
-                self.species.pop(idx)
-                
-        self.adjust_fitness_scores()
+        sorted_population = sorted(self.population,
+                                   key = lambda x: x.fitness,
+                                   reverse=True)
+        population: List[ContextGenome]
+        if self.elite_rate > 0.0:
+            population = sorted_population[0:int(self.n_networks * self.elite_rate)]
+        else:
+            population = []
 
-        population: List[ContextGenome] = []
-
-        sorted_population = sorted(
-            self.population, key = lambda x: x.species.species_id)
-        grouped_population = [list(it) for k, it in groupby(
-            sorted_population, lambda x: x.species.species_id)]
-
-        # Preserve champions in the species
         self.generation += 1
-        for group in grouped_population:
-            if len(group) > 5:
-                best_genome = max(group, key = lambda x: x.fitness)
-                for node in best_genome.nodes:
-                    node.reset_values()
-                best_genome.generation = self.generation
-                population.append(best_genome)
-
         while len(population) < self.n_networks:
-            species = self.get_random_species()
-            genome_1 = self.get_random_genome(species)
-            if random.random() < self.interspecies_mating_rate:
-                species = self.get_random_species()
-            genome_2 = self.get_random_genome(species)
+            genome_1 = self.get_random_genome(sorted_population)
+            genome_2 = self.get_random_genome(sorted_population)
             new_genome = genome_1.crossover(genome_2)
-            if random.random() < self.weight_mutation_rate:
-                new_genome.weight_mutation(self.noise_magnitude, self.random_range)
+            if random.random() < self.disable_connection_mutation_rate:
+                new_genome.disable_connection_mutation()
             if random.random() < self.node_mutation_rate:
-                new_genome.add_node_mutation(activation = self.hidden_activation)
+                new_genome.add_node_mutation(
+                    dominant_gene_rate=self.dominant_gene_rate,
+                    activation = self.hidden_activation)
             if random.random() < self.connection_mutation_rate:
-                new_genome.add_connection_mutation(self.random_range)
+                new_genome.add_connection_mutation(
+                    sigma=self.sigma,
+                    dominant_gene_rate=self.dominant_gene_rate)
             new_genome.generation = self.generation
             population.append(new_genome)
 
         self.population = population
 
-    def adjust_fitness_scores(self) -> None:
-        for species in self.species:
-            for genome in species.genomes:
-                genome.fitness = genome.fitness / len(species.genomes)
-                species.total_adjusted_fitness += genome.fitness
-
-    def get_random_species(self) -> Species:
-        if len(self.species) == 1:
-            return self.species[0]
-        total = 0.0
-        length = 0
-        min_fitness = float('inf')
-        for species in self.species:
-            if species.stegnant < self.stegnant_threshold:
-                length += 1
-                total += species.total_adjusted_fitness
-                if species.total_adjusted_fitness < min_fitness:
-                    min_fitness = species.total_adjusted_fitness
-        total += length * (-min_fitness + 0.1)
+    def get_random_genome(self, sorted_population: List[ContextGenome]) -> ContextGenome:
+        """Return random genome from the population."""
+        min_fitness = sorted_population[-1].fitness
+        total: float = 0.0
+        for genome in sorted_population:
+            total += genome.fitness
+        total += self.n_networks * (-min_fitness + 0.1)
         r = random.random()
         upto = 0.0
-        for species in self.species:
-            if species.stegnant < self.stegnant_threshold:
-                score = (species.total_adjusted_fitness - min_fitness + 0.1) / total
-                upto += score
-                if upto >= r:
-                    return species
-        assert False
-
-    @staticmethod
-    def get_random_genome(species: Species) -> ContextGenome:
-        if len(species.genomes) == 1:
-            return species.genomes[0]
-        # Assume genomes are sorted by fitness, max first
-        min_fitness = species.genomes[-1].fitness
-        total = species.total_adjusted_fitness
-        total += len(species.genomes) * (-min_fitness + 0.1)
-        r = random.random()
-        upto = 0.0
-        for genome in species.genomes:
+        for genome in sorted_population:
             score = (genome.fitness - min_fitness + 0.1) / total
             upto += score
             if upto >= r:
@@ -293,4 +177,3 @@ class NEAT(object):
         neat = cls.__new__(cls)
         neat.__dict__.update(cls_dict)
         return neat
-
