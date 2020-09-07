@@ -190,7 +190,7 @@ class ContextGenome(Genome):
 
 class Agent(ABC):
     @abstractmethod
-    def rollout(self, genome: Genome) -> List[float]:
+    def rollout(self, genome: Genome) -> float:
         ...
 
 class NEATEST(object):
@@ -224,6 +224,9 @@ class NEATEST(object):
         ...
 
     def next_generation(self, rewards : List[float]) -> None:
+        ...
+
+    def train(self, n_steps: int) -> None:
         ...
 
     def get_random_genome(self, sorted_population: List[ContextGenome]) -> ContextGenome:

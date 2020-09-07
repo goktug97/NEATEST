@@ -44,7 +44,7 @@ class ContextGenome(Genome):
 
 class Agent(ABC):
     @abstractmethod
-    def rollout(self, genome: Genome) -> List[float]:
+    def rollout(self, genome: Genome) -> float:
         ...
 
 
@@ -64,6 +64,7 @@ class NEATEST(object):
                  hidden_activation: Callable[[float], float]=lambda x: x,
                  output_activation: Callable[[float], float]=lambda x: x):
 
+        self.agent = agent
         self.n_networks = n_networks
         self.input_size = input_size
         self.output_size = output_size
@@ -147,7 +148,19 @@ class NEATEST(object):
 
         self.population = population
 
-    def get_random_genome(self, sorted_population: List[ContextGenome]) -> ContextGenome:
+    def train(self, n_steps: int) -> None:
+        for step in range(n_steps):
+            rewards = []
+            print(f'Generation: {self.generation}')
+            for genome in self.population:
+                reward = self.agent.rollout(genome)
+                rewards.append(reward)
+            self.next_generation(rewards)
+            print(f'Max Reward Session: {self.best_fitness}')
+            print(f'Max Reward Step: {max(rewards)}')
+
+    def get_random_genome(
+            self, sorted_population: List[ContextGenome]) -> ContextGenome:
         """Return random genome from the population."""
         min_fitness = sorted_population[-1].fitness
         total: float = 0.0
@@ -163,7 +176,7 @@ class NEATEST(object):
                 return genome
         assert False
 
-    def save_checkpoint(self):
+    def save_checkpoint(self) -> None:
         import time
         import pathlib
         import os
@@ -180,7 +193,7 @@ class NEATEST(object):
             pickle.dump(self.__dict__, output, -1)
 
     @classmethod
-    def load_checkpoint(cls, filename):
+    def load_checkpoint(cls, filename: str) -> 'NEATEST':
         with open(filename, 'rb') as checkpoint:
             cls_dict = pickle.load(checkpoint)
         neat = cls.__new__(cls)
