@@ -18,10 +18,11 @@ class Connection(object):
         self.out_node = out_node
         self.enabled = True
         self.dummy = dummy
+        self.train = False
         if dummy: return
         self.innovation = Connection.register_connection(
             self, weight, dominant_gene_rate)
-
+        self.training_weight = self.weight
         self.out_node.inputs.append(self)
 
     def __gt__(self, other):
@@ -29,7 +30,17 @@ class Connection(object):
 
     @property
     def weight(self) -> float:
-        return self.weights[self.innovation]
+        if not self.train:
+            return self.weights[self.innovation]
+        else:
+            return self.training_weight
+
+    @weight.setter
+    def weight(self, value: float) -> None:
+        if not self.train:
+            self.weights[self.innovation] = value
+        else:
+            self.training_weight = value
 
     @property
     def dominant_gene_rate(self) -> float:

@@ -17,6 +17,7 @@ class Genome(object):
         self.input_size = len(grouped_nodes[0])
         self.output_size = len(grouped_nodes[-1])
         self.outputs = grouped_nodes[-1]
+        self._training: bool = False
 
     def add_connection_mutation(self, sigma: float, dominant_gene_rate: float) -> None:
         '''Create new connection between two random non-connected nodes.'''
@@ -74,7 +75,7 @@ class Genome(object):
                           second_connection.out_node.depth) / 2
         self.nodes.append(new_node)
 
-    def disable_connection_mutation(self):
+    def disable_connection_mutation(self) -> None:
         idx = random.randint(0, len(self.connections)-1)
         self.connections[idx].enabled = False
 
@@ -95,11 +96,51 @@ class Genome(object):
         return [node.value for node in self.outputs]
 
     @property
+    def training(self) -> bool:
+        return self._training
+
+    @training.setter
+    def training(self, value: bool) -> None:
+        self._training = value
+        for idx in reversed(range(len(self.connections))):
+            if self.connections[idx].enabled:
+                self.connections[idx].train = value
+            else:
+                del self.connections[idx]
+
+    def train(self) -> None:
+        genome = self.copy()
+        genome.training = True
+        weights = [connection.weight for connection in self.connections]
+
+    @property
     def size(self) -> int:
         return len(list(filter(lambda x: x.enabled, self.connections)))
 
     def copy(self):
-        return copy.deepcopy(self)
+        connections: List[Connection] = []
+        nodes: List[Node] = []
+        for idx in range(len(self.connections)):
+            connection = self.connections[idx]
+            in_node = Node(connection.in_node.id, connection.in_node.type,
+                           connection.in_node.activation,
+                           depth = connection.in_node.depth)
+            out_node = Node(connection.out_node.id, connection.out_node.type,
+                            connection.out_node.activation,
+                            depth = connection.out_node.depth)
+            nodes_dict = dict(zip(nodes, range(len(nodes))))
+            if in_node not in nodes_dict:
+                nodes.append(in_node)
+                nodes_dict[in_node] = len(nodes)-1
+            if out_node not in nodes_dict:
+                nodes.append(out_node)
+                nodes_dict[out_node] = len(nodes)-1
+            new_connection = Connection(nodes[nodes_dict[in_node]],
+                                    nodes[nodes_dict[out_node]])
+            new_connection.enabled = connection.enabled
+            connections.append(new_connection)
+        new_genome = Genome(nodes, connections)
+        return new_genome
 
     def crossover(self, other: 'Genome'):
         '''Crossover the genome with the other genome.'''
@@ -194,8 +235,8 @@ def draw_genome(genome: Genome,
                 vertical_distance: float = 0.25,
                 horizontal_distance: float = 0.25) -> None:
     '''Draw the genome to a matplotlib figure but do not show it.'''
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as patches
+    import matplotlib.pyplot as plt #type: ignore
+    import matplotlib.patches as patches #type: ignore
     plt.gcf().canvas.set_window_title('float')
 
     positions = {}

@@ -7,25 +7,26 @@ import functools
 import math
 import statistics
 import pickle
+from abc import ABC, abstractmethod
 
 from .genome import Genome
 from .node import Node, NodeType
 from .connection import Connection
 
 
-def sigmoid(x):
+def sigmoid(x: float) -> float:
     return 1 / (1 + math.exp(-x))
 
-def steepened_sigmoid(x):
+def steepened_sigmoid(x: float) -> float:
     return 1 / (1 + math.exp(-4.9 * x))
 
-def relu(x):
-    return max(x, 0)
+def relu(x: float) -> float:
+    return max(x, 0.0)
 
-def leaky_relu(x):
+def leaky_relu(x: float) -> float:
     return max(0.1*x, x)
 
-def tanh(x):
+def tanh(x: float) -> float:
     return math.tanh(x)
 
 
@@ -36,19 +37,28 @@ class ContextGenome(Genome):
         self.generation: int = 0
         super().__init__(nodes, connections)
 
-    def crossover(self, other: Genome) -> Genome:
+    def crossover(self, other: 'ContextGenome') -> 'ContextGenome': #type: ignore
         new_genome = super(ContextGenome, self).crossover(other)
         return ContextGenome(new_genome.nodes, new_genome.connections)
 
 
+class Agent(ABC):
+    @abstractmethod
+    def rollout(self, genome: Genome) -> List[float]:
+        ...
+
+
 class NEATEST(object):
-    def __init__(self, n_networks: int, input_size: int, output_size: int,
+    def __init__(self,
+                 agent: Agent,
+                 n_networks: int,
+                 input_size: int,
+                 output_size: int,
                  bias: bool,
                  node_mutation_rate: float,
                  connection_mutation_rate: float,
                  disable_connection_mutation_rate: float,
                  dominant_gene_rate: float,
-                 stegnant_threshold: int = 15,
                  elite_rate: float = 0.10,
                  sigma: float = 0.1,
                  hidden_activation: Callable[[float], float]=lambda x: x,
@@ -64,13 +74,13 @@ class NEATEST(object):
         self.node_mutation_rate = node_mutation_rate
         self.connection_mutation_rate = connection_mutation_rate
         self.dominant_gene_rate = dominant_gene_rate
-        self.stegnant_threshold = stegnant_threshold
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
 
-        self.generation = 0
+        self.generation: int = 0
         self.best_fitness: float = -float('inf')
         self.best_genome: ContextGenome
+        self.population: List[ContextGenome]
 
         self.create_population()
 
@@ -93,7 +103,6 @@ class NEATEST(object):
                                            dominant_gene_rate=self.dominant_gene_rate,
                                            weight=random.gauss(0.0, self.sigma))]
         return ContextGenome(input_nodes+output_nodes, connections)
-
 
     def create_population(self) -> None:
         population: List[ContextGenome] = []
