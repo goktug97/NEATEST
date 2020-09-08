@@ -11,6 +11,7 @@ class Connection(object):
     global_innovation: int = 0
     weights: List[float] = []
     dominant_gene_rates: List[float] = []
+    grads: List[float] = []
 
     def __init__(self, in_node: Node, out_node: Node, dominant_gene_rate: float = 0.0,
                  weight: float = 1.0, dummy: bool = False):
@@ -18,11 +19,9 @@ class Connection(object):
         self.out_node = out_node
         self.enabled = True
         self.dummy = dummy
-        self.train = False
         if dummy: return
         self.innovation = Connection.register_connection(
             self, weight, dominant_gene_rate)
-        self.training_weight = self.weight
         self.out_node.inputs.append(self)
 
     def __gt__(self, other):
@@ -30,21 +29,27 @@ class Connection(object):
 
     @property
     def weight(self) -> float:
-        if not self.train:
-            return self.weights[self.innovation]
-        else:
-            return self.training_weight
+        return self.weights[self.innovation]
 
     @weight.setter
     def weight(self, value: float) -> None:
-        if not self.train:
-            self.weights[self.innovation] = value
-        else:
-            self.training_weight = value
+        self.weights[self.innovation] = value
+
+    @property
+    def grad(self) -> float:
+        return self.grads[self.innovation]
+
+    @grad.setter
+    def grad(self, value: float) -> None:
+        self.grads[self.innovation] = value
 
     @property
     def dominant_gene_rate(self) -> float:
         return self.dominant_gene_rates[self.innovation]
+
+    @dominant_gene_rate.setter
+    def dominant_gene_rate(self, value: float) -> None:
+        self.dominant_gene_rates[self.innovation] = value
 
     @classmethod
     def register_connection(cls, new_connection:'Connection', weight: float,
@@ -53,6 +58,7 @@ class Connection(object):
             return cls.connections[new_connection]
         else:
             cls.weights.append(weight)
+            cls.grads.append(0.0)
             cls.dominant_gene_rates.append(dominant_gene_rate)
             innovation = cls.global_innovation
             cls.global_innovation += 1

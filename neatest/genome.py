@@ -17,7 +17,6 @@ class Genome(object):
         self.input_size = len(grouped_nodes[0])
         self.output_size = len(grouped_nodes[-1])
         self.outputs = grouped_nodes[-1]
-        self._training: bool = False
 
     def add_connection_mutation(self, sigma: float, dominant_gene_rate: float) -> None:
         '''Create new connection between two random non-connected nodes.'''
@@ -94,24 +93,6 @@ class Genome(object):
                         value += connection.in_node.value * connection.weight
             node.value = node.activation(value)
         return [node.value for node in self.outputs]
-
-    @property
-    def training(self) -> bool:
-        return self._training
-
-    @training.setter
-    def training(self, value: bool) -> None:
-        self._training = value
-        for idx in reversed(range(len(self.connections))):
-            if self.connections[idx].enabled:
-                self.connections[idx].train = value
-            else:
-                del self.connections[idx]
-
-    def train(self) -> None:
-        genome = self.copy()
-        genome.training = True
-        weights = [connection.weight for connection in self.connections]
 
     @property
     def size(self) -> int:

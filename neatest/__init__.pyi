@@ -1,7 +1,21 @@
 from abc import ABC, abstractmethod
-from typing import Union, List, Callable, Tuple
+from typing import Union, List, Callable, Tuple, NewType, Type
 from enum import Enum
 import functools
+
+import numpy as np
+
+Array = Union[np.ndarray, np.generic]
+
+@functools.lru_cache(maxsize=1)
+def _center_function(population_size: int) -> Array:
+    ...
+
+def _compute_ranks(rewards: Union[List[float], Array]) -> Array:
+    ...
+
+def rank_transformation(rewards: Union[List[float], Array]) -> Array:
+    ...
 
 @functools.total_ordering
 class NodeType(Enum):
@@ -85,7 +99,19 @@ class Connection(object):
         ...
 
     @property
+    def grad(self) -> float:
+        ...
+
+    @grad.setter
+    def grad(self, value: float) -> None:
+        ...
+
+    @property
     def dominant_gene_rate(self) -> float:
+        ...
+
+    @dominant_gene_rate.setter
+    def dominant_gene_rate(self, value: float) -> None:
         ...
 
     @classmethod
@@ -137,17 +163,6 @@ class Genome(object):
         ...
 
     @property
-    def training(self) -> bool:
-        ...
-
-    @training.setter
-    def training(self, value: bool) -> None:
-        ...
-
-    def train(self) -> None:
-        ...
-
-    @property
     def size(self) -> int:
         ...
 
@@ -188,9 +203,29 @@ class ContextGenome(Genome):
     def crossover(self, other: ContextGenome) -> ContextGenome: #type: ignore
         ...
 
+SortedContextGenomes = NewType('SortedContextGenomes', List[ContextGenome])
+
+class Optimizer(ABC):
+
+    @staticmethod
+    def zero_grad() -> None:
+        ...
+
+    @abstractmethod
+    def step(self) -> None:
+        ...
+
 class Agent(ABC):
     @abstractmethod
     def rollout(self, genome: Genome) -> float:
+        ...
+
+class Adam(Optimizer):
+    def __init__(self, lr: float, beta_1: float = ..., beta_2:
+                 float = ..., epsilon: float = ...):
+        ...
+
+    def step(self) -> None:
         ...
 
 class NEATEST(object):
@@ -201,7 +236,9 @@ class NEATEST(object):
 
     def __init__(self,
                  agent: Agent,
+                 optimizer: Optimizer,
                  n_networks: int,
+                 es_population: int,
                  input_size: int,
                  output_size: int,
                  bias: bool,
@@ -209,6 +246,7 @@ class NEATEST(object):
                  connection_mutation_rate: float,
                  disable_connection_mutation_rate: float,
                  dominant_gene_rate: float,
+                 dominant_gene_delta: float,
                  elite_rate: float = ...,
                  sigma: float = ...,
                  hidden_activation: Callable[[float], float]=...,
@@ -223,13 +261,20 @@ class NEATEST(object):
     def create_population(self) -> None:
         ...
 
-    def next_generation(self, rewards : List[float]) -> None:
+    def next_generation(self, sorted_population: SortedContextGenomes) -> None:
+        ...
+
+    def calculate_grads(self, genome: ContextGenome) -> None:
         ...
 
     def train(self, n_steps: int) -> None:
         ...
 
-    def get_random_genome(self, sorted_population: List[ContextGenome]) -> ContextGenome:
+    @staticmethod
+    def sort_population(population: List[ContextGenome]) -> SortedContextGenomes:
+        ...
+
+    def get_random_genome(self, sorted_population: SortedContextGenomes) -> ContextGenome:
         ...
 
     def save_checkpoint(self) -> None:

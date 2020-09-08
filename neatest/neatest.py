@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import random
 import copy
-from typing import Union, List, Callable, Tuple
+from typing import Union, List, Callable, Tuple, NewType
 from itertools import groupby
 import functools
 import math
@@ -9,10 +9,12 @@ import statistics
 import pickle
 from abc import ABC, abstractmethod
 
+import numpy as np
+
 from .genome import Genome
 from .node import Node, NodeType
 from .connection import Connection
-
+from .optimizers import Optimizer
 
 def sigmoid(x: float) -> float:
     return 1 / (1 + math.exp(-x))
@@ -29,6 +31,25 @@ def leaky_relu(x: float) -> float:
 def tanh(x: float) -> float:
     return math.tanh(x)
 
+Array = Union[np.ndarray, np.generic]
+
+@functools.lru_cache(maxsize=1)
+def _center_function(population_size: int) -> Array:
+    centers = np.arange(0, population_size)
+    centers = centers / (population_size - 1)
+    centers -= 0.5
+    return centers
+
+def _compute_ranks(rewards: Union[List[float], Array]) -> Array:
+    rewards = np.array(rewards)
+    ranks = np.empty(rewards.size, dtype=int)
+    ranks[rewards.argsort()] = np.arange(rewards.size)
+    return ranks
+
+def rank_transformation(rewards: Union[List[float], Array]) -> Array:
+    ranks = _compute_ranks(rewards)
+    values = _center_function(len(rewards))
+    return values[ranks] #type: ignore
 
 class ContextGenome(Genome):
     '''Genome class that holds data which depends on the context.'''
@@ -42,6 +63,9 @@ class ContextGenome(Genome):
         return ContextGenome(new_genome.nodes, new_genome.connections)
 
 
+SortedContextGenomes = NewType('SortedContextGenomes', List[ContextGenome])
+
+
 class Agent(ABC):
     @abstractmethod
     def rollout(self, genome: Genome) -> float:
@@ -51,7 +75,9 @@ class Agent(ABC):
 class NEATEST(object):
     def __init__(self,
                  agent: Agent,
+                 optimizer: Optimizer,
                  n_networks: int,
+                 es_population: int,
                  input_size: int,
                  output_size: int,
                  bias: bool,
@@ -59,12 +85,15 @@ class NEATEST(object):
                  connection_mutation_rate: float,
                  disable_connection_mutation_rate: float,
                  dominant_gene_rate: float,
-                 elite_rate: float = 0.10,
+                 dominant_gene_delta: float,
+                 elite_rate: float = 0.0,
                  sigma: float = 0.1,
                  hidden_activation: Callable[[float], float]=lambda x: x,
                  output_activation: Callable[[float], float]=lambda x: x):
 
         self.agent = agent
+        self.optimizer = optimizer
+        self.es_population = es_population
         self.n_networks = n_networks
         self.input_size = input_size
         self.output_size = output_size
@@ -75,6 +104,7 @@ class NEATEST(object):
         self.node_mutation_rate = node_mutation_rate
         self.connection_mutation_rate = connection_mutation_rate
         self.dominant_gene_rate = dominant_gene_rate
+        self.dominant_gene_delta = dominant_gene_delta
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
 
@@ -111,17 +141,8 @@ class NEATEST(object):
             population.append(self.random_genome())
         self.population = population
 
-    def next_generation(self, rewards : List[float]):
-        for idx, reward in enumerate(rewards):
-            self.population[idx].fitness = reward
-            if reward > self.best_fitness:
-                self.best_fitness = reward
-                self.best_genome = self.population[idx]
+    def next_generation(self, sorted_population: SortedContextGenomes):
 
-
-        sorted_population = sorted(self.population,
-                                   key = lambda x: x.fitness,
-                                   reverse=True)
         population: List[ContextGenome]
         if self.elite_rate > 0.0:
             population = sorted_population[0:int(self.n_networks * self.elite_rate)]
@@ -148,28 +169,84 @@ class NEATEST(object):
 
         self.population = population
 
+    def calculate_grads(self, genome: ContextGenome):
+        genome: ContextGenome = genome.copy() #type: ignore
+        for i in reversed(range(len(genome.connections))):
+            if not genome.connections[i].enabled:
+                del genome.connections[i]
+        weights: List[float] = [connection.weight for connection in genome.connections]
+        weights_array: Array = np.array(weights)
+        epsilon: Array = np.random.normal(0.0, self.sigma,
+                                          (self.es_population//2,
+                                           len(weights)))
+        population_weights: Array = np.concatenate([weights_array + epsilon,
+                                                    weights_array - epsilon])
+
+        rewards: List[float] = []
+        for i in range(self.es_population):
+            for j, connection in enumerate(genome.connections):
+                connection.weight = population_weights[i, j] #type: ignore
+            rewards.append(self.agent.rollout(genome))
+        rewards_array: Array = np.array(rewards)
+        ranked_rewards: Array = rank_transformation(rewards_array)
+        epsilon = np.concatenate([epsilon, -epsilon])
+        grads: Array = (np.dot(ranked_rewards, epsilon) /
+                        (self.es_population * self.sigma))
+        grads = np.clip(grads, -1.0, 1.0)
+            
+        for i in range(len(Connection.dominant_gene_rates)):
+            Connection.dominant_gene_rates[i] -= self.dominant_gene_delta
+
+        for i, connection in enumerate(genome.connections):
+            connection.weight = weights[i]
+            connection.grad = -grads[i] #type: ignore
+            connection.dominant_gene_rate += 2 * self.dominant_gene_delta
+
+        for i in range(len(Connection.dominant_gene_rates)):
+            rate = Connection.dominant_gene_rates[i]
+            Connection.dominant_gene_rates[i] = min(1.0, max(0.0, rate))
+
     def train(self, n_steps: int) -> None:
         for step in range(n_steps):
             rewards = []
             print(f'Generation: {self.generation}')
+
             for genome in self.population:
                 reward = self.agent.rollout(genome)
                 rewards.append(reward)
-            self.next_generation(rewards)
+
+            for idx, reward in enumerate(rewards):
+                self.population[idx].fitness = reward
+                if reward > self.best_fitness:
+                    self.best_fitness = reward
+                    self.best_genome = self.population[idx]
+
+            sorted_population: SortedContextGenomes = self.sort_population(
+                self.population)
+
+            self.optimizer.zero_grad()
+            self.calculate_grads(self.get_random_genome(sorted_population))
+            self.optimizer.step()
+
+            self.next_generation(sorted_population)
             print(f'Max Reward Session: {self.best_fitness}')
             print(f'Max Reward Step: {max(rewards)}')
 
-    def get_random_genome(
-            self, sorted_population: List[ContextGenome]) -> ContextGenome:
-        """Return random genome from the population."""
-        min_fitness = sorted_population[-1].fitness
+    @staticmethod
+    def sort_population(population: List[ContextGenome]) -> SortedContextGenomes:
+        return SortedContextGenomes(sorted(population, key = lambda x: x.fitness,
+                                           reverse=True))
+
+    def get_random_genome(self, population: SortedContextGenomes) -> ContextGenome:
+        """Return random genome from a sorted population."""
+        min_fitness = population[-1].fitness
         total: float = 0.0
-        for genome in sorted_population:
+        for genome in population:
             total += genome.fitness
         total += self.n_networks * (-min_fitness + 0.1)
         r = random.random()
         upto = 0.0
-        for genome in sorted_population:
+        for genome in population:
             score = (genome.fitness - min_fitness + 0.1) / total
             upto += score
             if upto >= r:
@@ -183,14 +260,15 @@ class NEATEST(object):
         import inspect
         frame = inspect.stack()[1]
         module = inspect.getmodule(frame[0])
-        folder = pathlib.Path(
-            f"{os.path.join(os.path.dirname(module.__file__), 'checkpoints')}")
-        folder.mkdir(parents=True, exist_ok=True)
-        filename = f'{int(time.time())}.checkpoint'
-        save_path = os.path.abspath(os.path.join(folder, filename))
-        print(f'Saving checkpoint: {save_path}')
-        with open(os.path.join(folder, filename), 'wb') as output:
-            pickle.dump(self.__dict__, output, -1)
+        if module is not None:
+            folder = pathlib.Path(
+                f"{os.path.join(os.path.dirname(module.__file__), 'checkpoints')}")
+            folder.mkdir(parents=True, exist_ok=True)
+            filename = f'{int(time.time())}.checkpoint'
+            save_path = os.path.abspath(os.path.join(folder, filename))
+            print(f'Saving checkpoint: {save_path}')
+            with open(os.path.join(folder, filename), 'wb') as output:
+                pickle.dump(self.__dict__, output, -1)
 
     @classmethod
     def load_checkpoint(cls, filename: str) -> 'NEATEST':
