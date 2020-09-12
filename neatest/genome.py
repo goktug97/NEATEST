@@ -75,8 +75,23 @@ class Genome(object):
         self.nodes.append(new_node)
 
     def disable_connection_mutation(self) -> None:
-        idx = random.randint(0, len(self.connections)-1)
-        self.connections[idx].enabled = False
+        def _disable_connection_mutation(depth = 0):
+            if depth > 20:
+                return
+            idx = random.randint(0, len(self.connections)-1)
+            if (self.connections[idx].out_node.type == NodeType.OUTPUT or
+                self.connections[idx].in_node.type == NodeType.INPUT or
+                self.connections[idx].in_node.type == NodeType.BIAS):
+                _disable_connection_mutation(depth + 1)
+                return
+            else:
+                if not self.connections[idx].enabled:
+                    _disable_connection_mutation(depth + 1)
+                    return
+                else:
+                    self.connections[idx].enabled = False
+                    return
+        _disable_connection_mutation()
 
     def __call__(self, inputs: List[float]) -> List[float]:
         self.nodes.sort(key=lambda x: x.depth)
@@ -97,6 +112,10 @@ class Genome(object):
     @property
     def size(self) -> int:
         return len(list(filter(lambda x: x.enabled, self.connections)))
+
+    def reset_values(self) -> None:
+        for node in self.nodes:
+            node.value = 0.0
 
     def copy(self):
         connections: List[Connection] = []

@@ -8,28 +8,20 @@ import math
 import statistics
 import pickle
 from abc import ABC, abstractmethod
+import operator
+import os
+import sys
 
 import numpy as np
+from mpi4py import MPI #type: ignore
 
 from .genome import Genome
 from .node import Node, NodeType
+from .node import sigmoid, steepened_sigmoid
+from .node import relu, leaky_relu
+from .node import tanh, passthrough
 from .connection import Connection
 from .optimizers import Optimizer
-
-def sigmoid(x: float) -> float:
-    return 1 / (1 + math.exp(-x))
-
-def steepened_sigmoid(x: float) -> float:
-    return 1 / (1 + math.exp(-4.9 * x))
-
-def relu(x: float) -> float:
-    return max(x, 0.0)
-
-def leaky_relu(x: float) -> float:
-    return max(0.1*x, x)
-
-def tanh(x: float) -> float:
-    return math.tanh(x)
 
 Array = Union[np.ndarray, np.generic]
 
@@ -86,11 +78,18 @@ class NEATEST(object):
                  disable_connection_mutation_rate: float,
                  dominant_gene_rate: float,
                  dominant_gene_delta: float,
+                 seed: int,
                  elite_rate: float = 0.0,
-                 sigma: float = 0.1,
-                 hidden_activation: Callable[[float], float]=lambda x: x,
-                 output_activation: Callable[[float], float]=lambda x: x):
+                 sigma: float = 0.01,
+                 hidden_activation: Callable[[float], float]=passthrough,
+                 output_activation: Callable[[float], float]=passthrough):
 
+        self.comm = MPI.COMM_WORLD
+        self.n_proc = self.comm.Get_size()
+        assert not n_networks % self.n_proc
+        assert not es_population % self.n_proc
+        random.seed(seed)
+        np.random.seed(seed)
         self.agent = agent
         self.optimizer = optimizer
         self.es_population = es_population
@@ -112,6 +111,10 @@ class NEATEST(object):
         self.best_fitness: float = -float('inf')
         self.best_genome: ContextGenome
         self.population: List[ContextGenome]
+
+        if not self.comm.rank == 0:
+            f = open(os.devnull, 'w')
+            sys.stdout = f
 
         self.create_population()
 
@@ -141,7 +144,9 @@ class NEATEST(object):
             population.append(self.random_genome())
         self.population = population
 
-    def next_generation(self, sorted_population: SortedContextGenomes):
+    def next_generation(self):
+        sorted_population: SortedContextGenomes = self.sort_population(
+                self.population)
 
         population: List[ContextGenome]
         if self.elite_rate > 0.0:
@@ -151,8 +156,8 @@ class NEATEST(object):
 
         self.generation += 1
         while len(population) < self.n_networks:
-            genome_1 = self.get_random_genome(sorted_population)
-            genome_2 = self.get_random_genome(sorted_population)
+            genome_1 = self.get_random_genome()
+            genome_2 = self.get_random_genome()
             new_genome = genome_1.crossover(genome_2)
             if random.random() < self.disable_connection_mutation_rate:
                 new_genome.disable_connection_mutation()
@@ -182,12 +187,16 @@ class NEATEST(object):
         population_weights: Array = np.concatenate([weights_array + epsilon,
                                                     weights_array - epsilon])
 
+        n_jobs = self.es_population // self.n_proc
         rewards: List[float] = []
-        for i in range(self.es_population):
+        rewards_array: Array = np.zeros(self.es_population, dtype='d')
+        for i in range(self.comm.rank*n_jobs, n_jobs * (self.comm.rank + 1)):
             for j, connection in enumerate(genome.connections):
                 connection.weight = population_weights[i, j] #type: ignore
+            genome.reset_values()
             rewards.append(self.agent.rollout(genome))
-        rewards_array: Array = np.array(rewards)
+        self.comm.Allgather([np.array(rewards, dtype=np.float64), MPI.DOUBLE],
+                            [rewards_array, MPI.DOUBLE])
         ranked_rewards: Array = rank_transformation(rewards_array)
         epsilon = np.concatenate([epsilon, -epsilon])
         grads: Array = (np.dot(ranked_rewards, epsilon) /
@@ -204,16 +213,21 @@ class NEATEST(object):
 
         for i in range(len(Connection.dominant_gene_rates)):
             rate = Connection.dominant_gene_rates[i]
-            Connection.dominant_gene_rates[i] = min(1.0, max(0.0, rate))
+            Connection.dominant_gene_rates[i] = min(0.6, max(0.4, rate))
 
     def train(self, n_steps: int) -> None:
+        n_jobs = self.n_networks // self.n_proc
         for step in range(n_steps):
             rewards = []
             print(f'Generation: {self.generation}')
 
-            for genome in self.population:
+            for genome in self.population[
+                    self.comm.rank*n_jobs: n_jobs * (self.comm.rank + 1)]:
+                genome.reset_values()
                 reward = self.agent.rollout(genome)
                 rewards.append(reward)
+            rewards = functools.reduce(
+                operator.iconcat, self.comm.allgather(rewards), [])
 
             for idx, reward in enumerate(rewards):
                 self.population[idx].fitness = reward
@@ -221,37 +235,30 @@ class NEATEST(object):
                     self.best_fitness = reward
                     self.best_genome = self.population[idx]
 
-            sorted_population: SortedContextGenomes = self.sort_population(
-                self.population)
+            self.train_genome(self.get_random_genome())
 
-            self.optimizer.zero_grad()
-            self.calculate_grads(self.get_random_genome(sorted_population))
-            self.optimizer.step()
-
-            self.next_generation(sorted_population)
+            self.next_generation()
             print(f'Max Reward Session: {self.best_fitness}')
             print(f'Max Reward Step: {max(rewards)}')
+
+    def train_genome(self, genome: ContextGenome, n_steps: int = 1):
+        for _ in range(n_steps):
+            self.optimizer.zero_grad()
+            self.calculate_grads(genome)
+            self.optimizer.step()
 
     @staticmethod
     def sort_population(population: List[ContextGenome]) -> SortedContextGenomes:
         return SortedContextGenomes(sorted(population, key = lambda x: x.fitness,
                                            reverse=True))
 
-    def get_random_genome(self, population: SortedContextGenomes) -> ContextGenome:
+    def get_random_genome(self) -> ContextGenome:
         """Return random genome from a sorted population."""
-        min_fitness = population[-1].fitness
-        total: float = 0.0
-        for genome in population:
-            total += genome.fitness
-        total += self.n_networks * (-min_fitness + 0.1)
-        r = random.random()
-        upto = 0.0
-        for genome in population:
-            score = (genome.fitness - min_fitness + 0.1) / total
-            upto += score
-            if upto >= r:
-                return genome
-        assert False
+        rewards: Array = np.array([genome.fitness for genome in self.population])
+        eps = np.finfo(float).eps
+        normalized_rewards: Array = rewards - rewards.min() + eps
+        probabilities = normalized_rewards / np.sum(normalized_rewards)
+        return np.random.choice(self.population, p=probabilities)
 
     def save_checkpoint(self) -> None:
         import time

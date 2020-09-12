@@ -4,8 +4,26 @@ from typing import Callable, Union, List, TYPE_CHECKING
 import copy
 from enum import Enum
 
+import numpy as np
+
 def passthrough(x):
     return x
+
+def sigmoid(x: float) -> float:
+    return 1 / (1 + np.exp(-x))
+
+def steepened_sigmoid(x: float) -> float:
+    return 1 / (1 + np.exp(-4.9 * x))
+
+def relu(x: float) -> float:
+    return max(x, 0.0)
+
+def leaky_relu(x: float) -> float:
+    return max(0.1*x, x)
+
+def tanh(x: float) -> float:
+    return np.tanh(x)
+
 
 @functools.total_ordering
 class NodeType(Enum):

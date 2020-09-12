@@ -247,6 +247,7 @@ class NEATEST(object):
                  disable_connection_mutation_rate: float,
                  dominant_gene_rate: float,
                  dominant_gene_delta: float,
+                 seed: int,
                  elite_rate: float = ...,
                  sigma: float = ...,
                  hidden_activation: Callable[[float], float]=...,
@@ -261,10 +262,16 @@ class NEATEST(object):
     def create_population(self) -> None:
         ...
 
-    def next_generation(self, sorted_population: SortedContextGenomes) -> None:
+    def next_generation(self) -> None:
         ...
 
     def calculate_grads(self, genome: ContextGenome) -> None:
+        ...
+
+    def train_genome(self, genome: ContextGenome, n_steps: int = ...):
+        ...
+
+    def reset_values(self) -> None:
         ...
 
     def train(self, n_steps: int) -> None:
@@ -274,7 +281,7 @@ class NEATEST(object):
     def sort_population(population: List[ContextGenome]) -> SortedContextGenomes:
         ...
 
-    def get_random_genome(self, sorted_population: SortedContextGenomes) -> ContextGenome:
+    def get_random_genome(self) -> ContextGenome:
         ...
 
     def save_checkpoint(self) -> None:
