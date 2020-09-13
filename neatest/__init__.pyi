@@ -258,7 +258,6 @@ class NEATEST(object):
     generation: int
     best_fitness: float
     best_genome: ContextGenome
-    comm: Comm
 
     def __init__(self,
                  agent: Agent,

@@ -52,10 +52,11 @@ a = neatest.NEATEST(
     node_mutation_rate = 0.3,
     connection_mutation_rate = 0.3)
 
-a.train(72)
+a.train(73)
 
 print(agent.rollout(a.best_genome, render=True))
-
 print(a.best_genome)
+
+a.best_genome.save('LunarLander.genome')
 
 agent.env.close()

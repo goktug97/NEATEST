@@ -34,7 +34,7 @@ class Connection(object):
     def detach(self) -> None:
         self.detached = True
         self.detached_weight = self.weights[self.innovation]
-        self.detached_dominant_gene_rate = self.dominant_gene_rate
+        self.detached_dominant_gene_rate = self.dominant_gene_rates[self.innovation]
 
     def attach(self) -> None:
         self.detached = False

@@ -90,10 +90,10 @@ class NEATEST(object):
                  hidden_activation: Callable[[float], float]=passthrough,
                  output_activation: Callable[[float], float]=passthrough):
 
-        self.comm = MPI.COMM_WORLD
-        self.n_proc = self.comm.Get_size()
-        assert not n_networks % self.n_proc
-        assert not es_population % self.n_proc
+        comm = MPI.COMM_WORLD
+        n_proc = comm.Get_size()
+        assert not n_networks % n_proc
+        assert not es_population % n_proc
         random.seed(seed)
         np.random.seed(seed)
         self.agent = agent
@@ -118,7 +118,7 @@ class NEATEST(object):
         self.best_genome: ContextGenome
         self.population: List[ContextGenome]
 
-        if not self.comm.rank == 0:
+        if not comm.rank == 0:
             f = open(os.devnull, 'w')
             sys.stdout = f
 
@@ -209,6 +209,7 @@ class NEATEST(object):
         self.population = population
 
     def calculate_grads(self, genome: ContextGenome):
+        comm = MPI.COMM_WORLD
         genome: ContextGenome = genome.copy() #type: ignore
         for i in reversed(range(len(genome.connections))):
             if not genome.connections[i].enabled:
@@ -221,15 +222,15 @@ class NEATEST(object):
         population_weights: Array = np.concatenate([weights_array + epsilon,
                                                     weights_array - epsilon])
 
-        n_jobs = self.es_population // self.n_proc
+        n_jobs = self.es_population // comm.Get_size()
         rewards: List[float] = []
         rewards_array: Array = np.zeros(self.es_population, dtype='d')
-        for i in range(self.comm.rank*n_jobs, n_jobs * (self.comm.rank + 1)):
+        for i in range(comm.rank*n_jobs, n_jobs * (comm.rank + 1)):
             for j, connection in enumerate(genome.connections):
                 connection.weight = population_weights[i, j] #type: ignore
             genome.reset_values()
             rewards.append(self.agent.rollout(genome))
-        self.comm.Allgather([np.array(rewards, dtype=np.float64), MPI.DOUBLE],
+        comm.Allgather([np.array(rewards, dtype=np.float64), MPI.DOUBLE],
                             [rewards_array, MPI.DOUBLE])
         ranked_rewards: Array = rank_transformation(rewards_array)
         epsilon = np.concatenate([epsilon, -epsilon])
@@ -250,26 +251,34 @@ class NEATEST(object):
             Connection.dominant_gene_rates[i] = min(0.6, max(0.4, rate))
 
     def train(self, n_steps: int) -> None:
-        n_jobs = self.n_networks // self.n_proc
+        comm = MPI.COMM_WORLD
+        n_jobs = self.n_networks // comm.Get_size()
         for step in range(n_steps):
             rewards = []
             print(f'Generation: {self.generation}')
 
             for genome in self.population[
-                    self.comm.rank*n_jobs: n_jobs * (self.comm.rank + 1)]:
+                    comm.rank*n_jobs: n_jobs * (comm.rank + 1)]:
                 genome.reset_values()
                 reward = self.agent.rollout(genome)
                 rewards.append(reward)
             rewards = functools.reduce(
-                operator.iconcat, self.comm.allgather(rewards), [])
+                operator.iconcat, comm.allgather(rewards), [])
 
+            detach = False
             for idx, reward in enumerate(rewards):
                 self.population[idx].fitness = reward
                 if reward > self.best_fitness:
+                    detach = True
                     self.best_fitness = reward
-                    self.best_genome = self.population[idx].copy().detach()
+                    self.best_genome = self.population[idx].copy()
 
             self.train_genome(self.get_random_genome())
+
+            # Detach after one step ES training
+            if detach:
+                self.best_genome.detach()
+                detach = False
 
             self.next_generation()
             print(f'Max Reward Session: {self.best_fitness}')
@@ -295,21 +304,22 @@ class NEATEST(object):
         return np.random.choice(self.population, p=probabilities)
 
     def save_checkpoint(self) -> None:
-        import time
-        import pathlib
-        import os
-        import inspect
-        frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
-        if module is not None:
-            folder = pathlib.Path(
-                f"{os.path.join(os.path.dirname(module.__file__), 'checkpoints')}")
-            folder.mkdir(parents=True, exist_ok=True)
-            filename = f'{int(time.time())}.checkpoint'
-            save_path = os.path.abspath(os.path.join(folder, filename))
-            print(f'Saving checkpoint: {save_path}')
-            with open(os.path.join(folder, filename), 'wb') as output:
-                pickle.dump(self.__dict__, output, -1)
+        if MPI.COMM_WORLD.rank == 0:
+            import time
+            import pathlib
+            import os
+            import inspect
+            frame = inspect.stack()[1]
+            module = inspect.getmodule(frame[0])
+            if module is not None:
+                folder = pathlib.Path(
+                    f"{os.path.join(os.path.dirname(module.__file__), 'checkpoints')}")
+                folder.mkdir(parents=True, exist_ok=True)
+                filename = f'{int(time.time())}.checkpoint'
+                save_path = os.path.abspath(os.path.join(folder, filename))
+                print(f'Saving checkpoint: {save_path}')
+                with open(os.path.join(folder, filename), 'wb') as output:
+                    pickle.dump(self.__dict__, output, -1)
 
     @classmethod
     def load_checkpoint(cls, filename: str) -> 'NEATEST':
@@ -317,4 +327,7 @@ class NEATEST(object):
             cls_dict = pickle.load(checkpoint)
         neat = cls.__new__(cls)
         neat.__dict__.update(cls_dict)
+        n_proc = MPI.COMM_WORLD.Get_size()
+        assert not neat.n_networks % n_proc
+        assert not neat.es_population % n_proc
         return neat

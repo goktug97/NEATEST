@@ -7,6 +7,7 @@ import pickle
 from .connection import Connection, align_connections
 from .node import Node, NodeType, group_nodes_by_depth, group_nodes_by_type
 
+from mpi4py import MPI #type: ignore
 
 class Genome(object):
     def __init__(self, nodes: List['Node'], connections: List[Connection]):
@@ -160,8 +161,9 @@ class Genome(object):
         draw_genome(self, node_radius, vertical_distance, horizontal_distance)
 
     def save(self, filename: str) -> None:
-        with open(filename, 'wb') as output:
-            pickle.dump(self.__dict__, output, -1)
+        if MPI.COMM_WORLD.rank == 0:
+            with open(filename, 'wb') as output:
+                pickle.dump(self.__dict__, output, -1)
 
     @classmethod
     def load(cls, filename: str) -> 'Genome':
