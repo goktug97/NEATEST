@@ -6,6 +6,5 @@ dist
 *egg-info
 *.json
 *.mp4
-test.py
 checkpoints
 *.pickle
