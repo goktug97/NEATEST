@@ -24,16 +24,34 @@ class Connection(object):
             self, weight, dominant_gene_rate)
         self.out_node.inputs.append(self)
 
+        self.detached: bool = False
+        self.detached_weight: float = 0.0
+        self.detached_dominant_gene_rate: float = 0.0
+
     def __gt__(self, other):
         return self.innovation > other.innovation
 
+    def detach(self) -> None:
+        self.detached = True
+        self.detached_weight = self.weights[self.innovation]
+        self.detached_dominant_gene_rate = self.dominant_gene_rate
+
+    def attach(self) -> None:
+        self.detached = False
+
     @property
     def weight(self) -> float:
-        return self.weights[self.innovation]
+        if not self.detached:
+            return self.weights[self.innovation]
+        else:
+            return self.detached_weight
 
     @weight.setter
     def weight(self, value: float) -> None:
-        self.weights[self.innovation] = value
+        if not self.detached:
+            self.weights[self.innovation] = value
+        else:
+            self.detached_weight = value
 
     @property
     def grad(self) -> float:
@@ -45,11 +63,17 @@ class Connection(object):
 
     @property
     def dominant_gene_rate(self) -> float:
-        return self.dominant_gene_rates[self.innovation]
+        if not self.detached:
+            return self.dominant_gene_rates[self.innovation]
+        else:
+            return self.detached_dominant_gene_rate
 
     @dominant_gene_rate.setter
     def dominant_gene_rate(self, value: float) -> None:
-        self.dominant_gene_rates[self.innovation] = value
+        if not self.detached:
+            self.dominant_gene_rates[self.innovation] = value
+        else:
+            self.detached_dominant_gene_rate = value
 
     @classmethod
     def register_connection(cls, new_connection:'Connection', weight: float,

@@ -117,6 +117,14 @@ class Genome(object):
         for node in self.nodes:
             node.value = 0.0
 
+    def detach(self) -> None:
+        for connection in self.connections:
+            connection.detach()
+
+    def attach(self) -> None:
+        for connection in self.connections:
+            connection.attach()
+
     def copy(self):
         connections: List[Connection] = []
         nodes: List[Node] = []

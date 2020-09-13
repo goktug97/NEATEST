@@ -89,11 +89,21 @@ def group_nodes_by_depth(nodes: List[Node]) -> List[List[Node]]:
     ...
 
 class Connection(object):
+    detached: bool = False
+    detached_weight: float
+    detached_dominant_gene_rate: float
+
     def __init__(self, in_node: Node, out_node: Node, dominant_gene_rate: float = ...,
                  weight: float = ..., dummy: bool = ...):
         ...
 
     def __gt__(self, other: 'Connection') -> bool:
+        ...
+
+    def detach(self) -> None:
+        ...
+
+    def attach(self) -> None:
         ...
 
     @property
@@ -166,6 +176,12 @@ class Genome(object):
         ...
 
     def __call__(self, inputs: List[float]) -> List[float]:
+        ...
+
+    def detach(self) -> None:
+        ...
+
+    def attach(self) -> None:
         ...
 
     @property

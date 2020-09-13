@@ -267,7 +267,7 @@ class NEATEST(object):
                 self.population[idx].fitness = reward
                 if reward > self.best_fitness:
                     self.best_fitness = reward
-                    self.best_genome = self.population[idx]
+                    self.best_genome = self.population[idx].copy().detach()
 
             self.train_genome(self.get_random_genome())
 

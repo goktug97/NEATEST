@@ -52,7 +52,7 @@ a = neatest.NEATEST(
     node_mutation_rate = 0.3,
     connection_mutation_rate = 0.3)
 
-a.train(100)
+a.train(72)
 
 print(agent.rollout(a.best_genome, render=True))
 
