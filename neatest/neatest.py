@@ -54,6 +54,11 @@ class ContextGenome(Genome):
         new_genome = super(ContextGenome, self).crossover(other)
         return ContextGenome(new_genome.nodes, new_genome.connections)
 
+    def copy(self) -> 'ContextGenome': #type: ignore
+        new_genome = super(ContextGenome, self).copy()
+        return ContextGenome(new_genome.nodes, new_genome.connections)
+
+
 
 SortedContextGenomes = NewType('SortedContextGenomes', List[ContextGenome])
 
@@ -79,6 +84,7 @@ class NEATEST(object):
                  dominant_gene_rate: float,
                  dominant_gene_delta: float,
                  seed: int,
+                 hidden_layers: List[int] = [],
                  elite_rate: float = 0.0,
                  sigma: float = 0.01,
                  hidden_activation: Callable[[float], float]=passthrough,
@@ -116,35 +122,63 @@ class NEATEST(object):
             f = open(os.devnull, 'w')
             sys.stdout = f
 
-        self.create_population()
+        self.create_population(hidden_layers)
 
-    def random_genome(self) -> ContextGenome:
+    def random_genome(self, hidden_layers) -> ContextGenome:
         '''Create fc neural network without hidden layers with random weights.'''
+        layers = []
         connections: List[Connection] = []
-        input_nodes = [Node(i, NodeType.INPUT, depth = 0.0)
-                       for i in range(self.input_size)]
-        if self.bias:
-            input_nodes.append(Node(self.input_size, NodeType.BIAS, value = 1.0,
-                                    depth = 0.0))
-        output_nodes = [Node(i+len(input_nodes), NodeType.OUTPUT,
-                             self.output_activation, depth = 1.0)
-                        for i in range(self.output_size)]
-        for i in range(len(input_nodes)):
-            input_node = input_nodes[i]
-            for j in range(self.output_size):
-                output_node = output_nodes[j]
-                connections += [Connection(in_node=input_node, out_node=output_node,
-                                           dominant_gene_rate=self.dominant_gene_rate,
-                                           weight=random.gauss(0.0, self.sigma))]
-        return ContextGenome(input_nodes+output_nodes, connections)
 
-    def create_population(self) -> None:
-        population: List[ContextGenome] = []
+        # Input Nodes
+        input_nodes = [Node(-1, NodeType.INPUT, depth = 0.0)
+                       for _ in range(self.input_size)]
+        if self.bias:
+            input_nodes.append(Node(-1, NodeType.BIAS, value = 1.0,
+                                    depth = 0.0))
+        layers.append(input_nodes)
+
+        # Hidden Nodes
+        for idx, hidden_layer in enumerate(hidden_layers):
+            depth = 1 / (len(hidden_layers) + 1) * (idx + 1)
+            hidden_nodes = [Node(-1,
+                                 NodeType.HIDDEN,
+                                 self.hidden_activation,
+                                 depth = depth)
+                           for _ in range(hidden_layer)]
+            if self.bias:
+                hidden_nodes.append(
+                    Node(-1,
+                         NodeType.BIAS, value = 1.0,
+                         depth = depth))
+            layers.append(hidden_nodes)
+
+        # Output Nodes
+        output_nodes = [Node(-1, NodeType.OUTPUT,
+                             self.output_activation, depth = 1.0)
+                        for _ in range(self.output_size)]
+        layers.append(output_nodes)
+
+        for i in range(1, len(layers)):
+            for j in range(len(layers[i-1])):
+                input_node = layers[i-1][j]
+                for k in range(len(layers[i])):
+                    output_node = layers[i][k]
+                    connections += [Connection(
+                        in_node=input_node, out_node=output_node,
+                        dominant_gene_rate=self.dominant_gene_rate,
+                        weight=random.gauss(0.0, self.sigma))]
+
+        nodes: List[Node] = functools.reduce(operator.iconcat, layers, [])
+        return ContextGenome(nodes, connections)
+
+    def create_population(self, hidden_layers) -> None:
+        population: List[ContextGenome] = [self.random_genome(hidden_layers)]
         for _ in range(self.n_networks):
-            population.append(self.random_genome())
+            population.append(population[0].copy())
         self.population = population
 
     def next_generation(self):
+
         sorted_population: SortedContextGenomes = self.sort_population(
                 self.population)
 
@@ -202,7 +236,7 @@ class NEATEST(object):
         grads: Array = (np.dot(ranked_rewards, epsilon) /
                         (self.es_population * self.sigma))
         grads = np.clip(grads, -1.0, 1.0)
-            
+
         for i in range(len(Connection.dominant_gene_rates)):
             Connection.dominant_gene_rates[i] -= self.dominant_gene_delta
 

@@ -7,6 +7,12 @@ import numpy as np
 
 Array = Union[np.ndarray, np.generic]
 
+class Comm():
+    rank: int
+
+    def Get_size(self) -> int:
+        ...
+
 @functools.lru_cache(maxsize=1)
 def _center_function(population_size: int) -> Array:
     ...
@@ -203,6 +209,9 @@ class ContextGenome(Genome):
     def crossover(self, other: ContextGenome) -> ContextGenome: #type: ignore
         ...
 
+    def copy(self) -> 'ContextGenome': #type: ignore
+        ...
+
 SortedContextGenomes = NewType('SortedContextGenomes', List[ContextGenome])
 
 class Optimizer(ABC):
@@ -233,6 +242,7 @@ class NEATEST(object):
     generation: int
     best_fitness: float
     best_genome: ContextGenome
+    comm: Comm
 
     def __init__(self,
                  agent: Agent,
@@ -248,6 +258,7 @@ class NEATEST(object):
                  dominant_gene_rate: float,
                  dominant_gene_delta: float,
                  seed: int,
+                 hidden_layers: List[int] = ...,
                  elite_rate: float = ...,
                  sigma: float = ...,
                  hidden_activation: Callable[[float], float]=...,

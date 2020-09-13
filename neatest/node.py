@@ -1,5 +1,5 @@
 import functools
-from itertools import groupby
+from itertools import groupby, count
 from typing import Callable, Union, List, TYPE_CHECKING
 import copy
 from enum import Enum
@@ -22,7 +22,7 @@ def leaky_relu(x: float) -> float:
     return max(0.1*x, x)
 
 def tanh(x: float) -> float:
-    return np.tanh(x)
+    return float(np.tanh(x))
 
 
 @functools.total_ordering
@@ -37,11 +37,15 @@ class NodeType(Enum):
 
 
 class Node(object):
+    id_generator = count(0, 1)
     def __init__(self, id: int, type: NodeType,
                  activation: Callable[[float], float] = passthrough,
                  value: Union[float, None] = None,
                  depth: float = 0.0):
-        self.id = id
+        if id == -1:
+            self.id = next(self.id_generator)
+        else:
+            self.id = id
         self.type = type
         self.activation = activation
         self._value = value

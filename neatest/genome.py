@@ -57,7 +57,7 @@ class Genome(object):
         '''Add a node to a random connection and split the connection.'''
         idx = random.randint(0, len(self.connections)-1)
         self.connections[idx].enabled = False
-        new_node = Node(max(self.nodes, key=lambda x: x.id)+1,
+        new_node = Node(-1,
                         NodeType.HIDDEN, activation)
         first_connection = Connection(in_node=self.connections[idx].in_node,
                                       out_node=new_node,
