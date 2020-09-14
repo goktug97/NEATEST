@@ -28,7 +28,7 @@ class Agent(neatest.Agent):
 
 agent = Agent()
 
-SEED = 123
+SEED = 321
 agent.env.seed(SEED)
 agent.env.action_space.seed(SEED)
 
