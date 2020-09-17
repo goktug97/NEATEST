@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 import operator
 import os
 import sys
+import time
 
 import numpy as np
 from mpi4py import MPI #type: ignore
@@ -84,6 +85,7 @@ class NEATEST(object):
                  dominant_gene_rate: float,
                  dominant_gene_delta: float,
                  seed: int,
+                 logdir: str = None,
                  hidden_layers: List[int] = [],
                  elite_rate: float = 0.0,
                  sigma: float = 0.01,
@@ -94,8 +96,10 @@ class NEATEST(object):
         n_proc = comm.Get_size()
         assert not n_networks % n_proc
         assert not es_population % n_proc
+        self.seed = seed;
         random.seed(seed)
         np.random.seed(seed)
+        self.logdir = logdir
         self.agent = agent
         self.optimizer = optimizer
         self.es_population = es_population
@@ -117,6 +121,8 @@ class NEATEST(object):
         self.best_fitness: float = -float('inf')
         self.best_genome: ContextGenome
         self.population: List[ContextGenome]
+
+        self.data: List[Tuple[int, str, int, float]] = []
 
         if not comm.rank == 0:
             f = open(os.devnull, 'w')
@@ -177,10 +183,7 @@ class NEATEST(object):
             population.append(population[0].copy())
         self.population = population
 
-    def next_generation(self):
-
-        sorted_population: SortedContextGenomes = self.sort_population(
-                self.population)
+    def next_generation(self, sorted_population: SortedContextGenomes):
 
         population: List[ContextGenome]
         if self.elite_rate > 0.0:
@@ -255,8 +258,6 @@ class NEATEST(object):
         n_jobs = self.n_networks // comm.Get_size()
         for step in range(n_steps):
             rewards = []
-            print(f'Generation: {self.generation}')
-
             for genome in self.population[
                     comm.rank*n_jobs: n_jobs * (comm.rank + 1)]:
                 genome.reset_values()
@@ -268,7 +269,7 @@ class NEATEST(object):
             detach = False
             for idx, reward in enumerate(rewards):
                 self.population[idx].fitness = reward
-                if reward > self.best_fitness:
+                if reward >= self.best_fitness:
                     detach = True
                     self.best_fitness = reward
                     self.best_genome = self.population[idx].copy()
@@ -280,15 +281,37 @@ class NEATEST(object):
                 self.best_genome.detach()
                 detach = False
 
-            self.next_generation()
+            sorted_population: SortedContextGenomes = self.sort_population(
+                self.population)
+
+            reward = self.agent.rollout(sorted_population[0])
+            self.data.append((int(self.generation), 'NEATEST', self.seed, reward))
+
+            print(f'Generation: {self.generation}')
+            print(f'Rollout Reward: {reward}')
             print(f'Max Reward Session: {self.best_fitness}')
             print(f'Max Reward Step: {max(rewards)}')
+
+            self.next_generation(sorted_population)
+
+        if self.logdir:
+            if MPI.COMM_WORLD.rank == 0:
+                self.save_logs()
 
     def train_genome(self, genome: ContextGenome, n_steps: int = 1):
         for _ in range(n_steps):
             self.optimizer.zero_grad()
             self.calculate_grads(genome)
             self.optimizer.step()
+
+    def save_logs(self):
+        import pandas as pd #type: ignore
+        data = pd.DataFrame(
+            self.data, columns=['Generation', 'Algorithm', 'Seed', 'Reward'])
+        data = data.astype(
+            {"Generation": int, "Algorithm": str, 'Seed': int, 'Reward': float})
+        file = os.path.join(self.logdir, f'{time.strftime("%Y%m%d-%H%M%S")}.csv')
+        data.to_csv(file, index=False)
 
     @staticmethod
     def sort_population(population: List[ContextGenome]) -> SortedContextGenomes:
@@ -305,9 +328,7 @@ class NEATEST(object):
 
     def save_checkpoint(self) -> None:
         if MPI.COMM_WORLD.rank == 0:
-            import time
             import pathlib
-            import os
             import inspect
             frame = inspect.stack()[1]
             module = inspect.getmodule(frame[0])

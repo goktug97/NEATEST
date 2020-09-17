@@ -28,7 +28,7 @@ class Agent(neatest.Agent):
 
 agent = Agent()
 
-SEED = 321
+SEED = 123
 agent.env.seed(SEED)
 agent.env.action_space.seed(SEED)
 
@@ -48,6 +48,7 @@ a = neatest.NEATEST(
     sigma = 0.01,
     disable_connection_mutation_rate = 0.3,
     seed = SEED,
+    logdir = './logs/test',
     hidden_activation=neatest.relu,
     node_mutation_rate = 0.3,
     connection_mutation_rate = 0.3)

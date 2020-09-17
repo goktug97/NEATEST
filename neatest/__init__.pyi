@@ -273,6 +273,7 @@ class NEATEST(object):
                  dominant_gene_rate: float,
                  dominant_gene_delta: float,
                  seed: int,
+                 logdir: str = ...,
                  hidden_layers: List[int] = ...,
                  elite_rate: float = ...,
                  sigma: float = ...,
@@ -288,7 +289,7 @@ class NEATEST(object):
     def create_population(self) -> None:
         ...
 
-    def next_generation(self) -> None:
+    def next_generation(self, sorted_population: SortedContextGenomes) -> None:
         ...
 
     def calculate_grads(self, genome: ContextGenome) -> None:
