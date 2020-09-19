@@ -5,7 +5,7 @@ import random
 import pickle
 
 from .connection import Connection, align_connections
-from .node import Node, NodeType, group_nodes_by_depth, group_nodes_by_type
+from .node import Node, NodeType, group_nodes
 
 from mpi4py import MPI #type: ignore
 
@@ -14,7 +14,7 @@ class Genome(object):
         self.connections = connections
         self.nodes = nodes
 
-        grouped_nodes = group_nodes_by_type(self.nodes)
+        grouped_nodes = group_nodes(self.nodes, 'type')
         self.input_size = len(grouped_nodes[0])
         self.output_size = len(grouped_nodes[-1])
         self.outputs = grouped_nodes[-1]
@@ -102,11 +102,7 @@ class Genome(object):
                 value += inputs[node.id]
             for connection in node.inputs:
                 if connection.enabled:
-                    if (connection.in_node.depth >= node.depth):
-                        if connection.in_node.old_value is not None:
-                            value += connection.in_node.old_value * connection.weight
-                    else:
-                        value += connection.in_node.value * connection.weight
+                    value += connection.in_node.value * connection.weight
             node.value = node.activation(value)
         return [node.value for node in self.outputs]
 
@@ -250,7 +246,7 @@ def draw_genome(genome: Genome,
     plt.gcf().canvas.set_window_title('float')
 
     positions = {}
-    node_groups = group_nodes_by_depth(genome.nodes)
+    node_groups = group_nodes(genome.nodes, 'depth')
     for group_idx, nodes in enumerate(node_groups):
         y_position = -vertical_distance * (len(nodes)-1)/2
         for i, node in enumerate(nodes):

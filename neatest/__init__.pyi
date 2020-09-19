@@ -49,7 +49,7 @@ def tanh(x: float) -> float:
 class Node():
     def __init__(self, id: int, type: NodeType,
                  activation: Callable[[float], float] = ...,
-                 value: Union[float, None] = ...,
+                 value: float = ...,
                  depth: float = ...):
         ...
 
@@ -70,9 +70,6 @@ class Node():
     def __eq__(self, other: object) -> bool:
         ...
 
-    def __add__(self, other: Union['Node', int]) -> int:
-        ...
-
     def copy(self) -> 'Node':
         ...
 
@@ -82,10 +79,7 @@ class Node():
     def __repr__(self) -> str:
         ...
 
-def group_nodes_by_type(nodes: List[Node]) -> List[List[Node]]:
-    ...
-
-def group_nodes_by_depth(nodes: List[Node]) -> List[List[Node]]:
+def group_nodes(nodes: List[Node], by: str) -> List[List[Node]]:
     ...
 
 class Connection(object):

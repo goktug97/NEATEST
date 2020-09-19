@@ -60,7 +60,6 @@ class ContextGenome(Genome):
         return ContextGenome(new_genome.nodes, new_genome.connections)
 
 
-
 SortedContextGenomes = NewType('SortedContextGenomes', List[ContextGenome])
 
 
@@ -127,6 +126,10 @@ class NEATEST(object):
         if not comm.rank == 0:
             f = open(os.devnull, 'w')
             sys.stdout = f
+        else:
+            if logdir:
+                from pathlib import Path
+                Path(logdir).mkdir(parents=True, exist_ok=True)
 
         self.create_population(hidden_layers)
 
@@ -328,6 +331,8 @@ class NEATEST(object):
 
     def save_checkpoint(self) -> None:
         if MPI.COMM_WORLD.rank == 0:
+            self.random_state = random.getstate()
+            self.np_random_state = np.random.get_state()
             import pathlib
             import inspect
             frame = inspect.stack()[1]
@@ -351,4 +356,6 @@ class NEATEST(object):
         n_proc = MPI.COMM_WORLD.Get_size()
         assert not neat.n_networks % n_proc
         assert not neat.es_population % n_proc
+        np.random.set_state(neat.np_random_state)
+        random.setstate(neat.random_state)
         return neat

@@ -8,3 +8,4 @@ dist
 *.mp4
 checkpoints
 *.pickle
+*.genome

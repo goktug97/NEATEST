@@ -40,7 +40,7 @@ class Node(object):
     id_generator = count(0, 1)
     def __init__(self, id: int, type: NodeType,
                  activation: Callable[[float], float] = passthrough,
-                 value: Union[float, None] = None,
+                 value: float = 0.0,
                  depth: float = 0.0):
         if id == -1:
             self.id = next(self.id_generator)
@@ -48,8 +48,7 @@ class Node(object):
             self.id = id
         self.type = type
         self.activation = activation
-        self._value = value
-        self.old_value = None
+        self.value = value
         self.depth = depth
         self.visited = False
 
@@ -57,17 +56,8 @@ class Node(object):
             from .connection import Connection
         self.inputs: List[Connection] = []
 
-    @property
-    def value(self):
-        return self._value
-
-    @value.setter
-    def value(self, value):
-        self.old_value, self._value = self._value, value
-
     def reset_values(self):
-        self._value = None
-        self.old_value = None
+        self.value = 0.0
 
     def __hash__(self):
         return hash(str(self.id))
@@ -78,14 +68,6 @@ class Node(object):
         else:
             raise ValueError(f'Value type should be Node, got {type(other)}')
 
-    def __add__(self, other: Union['Node', int]) -> int:
-        if isinstance(other, Node):
-            return self.id + other.id
-        elif isinstance(other, int):
-            return self.id + other
-        else:
-            raise ValueError(f'Value type should be Node or int, got {type(other)}')
-
     def copy(self):
         return copy.deepcopy(self)
 
@@ -95,12 +77,9 @@ class Node(object):
     def __repr__(self):
         return str(self.id)
 
-def group_nodes_by_type(nodes: List[Node]) -> List[List[Node]]:
-    sorted_nodes = sorted(nodes, key = lambda x: x.type)
-    grouped_nodes = [list(it) for k, it in groupby(sorted_nodes, lambda x: x.type)]
-    return grouped_nodes
 
-def group_nodes_by_depth(nodes: List[Node]) -> List[List[Node]]:
-    sorted_nodes = sorted(nodes, key = lambda x: x.depth)
-    grouped_nodes = [list(it) for k, it in groupby(sorted_nodes, lambda x: x.depth)]
+def group_nodes(nodes: List[Node], by) -> List[List[Node]]:
+    sorted_nodes = sorted(nodes, key = lambda x: getattr(x, by))
+    grouped_nodes = [list(it) for k, it in groupby(
+        sorted_nodes, lambda x: getattr(x, by))]
     return grouped_nodes
