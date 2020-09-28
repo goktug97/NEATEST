@@ -37,27 +37,19 @@ class NodeType(Enum):
 
 
 class Node(object):
-    id_generator = count(0, 1)
     def __init__(self, id: int, type: NodeType,
                  activation: Callable[[float], float] = passthrough,
                  value: float = 0.0,
                  depth: float = 0.0):
-        if id == -1:
-            self.id = next(self.id_generator)
-        else:
-            self.id = id
         self.type = type
+        self.id = id
         self.activation = activation
         self.value = value
         self.depth = depth
-        self.visited = False
 
         if TYPE_CHECKING:
             from .connection import Connection
         self.inputs: List[Connection] = []
-
-    def reset_values(self):
-        self.value = 0.0
 
     def __hash__(self):
         return hash(str(self.id))

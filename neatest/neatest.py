@@ -2,7 +2,7 @@
 import random
 import copy
 from typing import Union, List, Callable, Tuple, NewType
-from itertools import groupby
+import itertools
 import functools
 import math
 import statistics
@@ -46,18 +46,21 @@ def rank_transformation(rewards: Union[List[float], Array]) -> Array:
 
 class ContextGenome(Genome):
     '''Genome class that holds data which depends on the context.'''
-    def __init__(self, nodes: List[Node], connections: List[Connection]):
+    def __init__(self, nodes: List[Node], connections: List[Connection],
+                 node_generator: itertools.count):
         self.fitness: float = 0.0
         self.generation: int = 0
-        super().__init__(nodes, connections)
+        super().__init__(nodes, connections, node_generator)
 
     def crossover(self, other: 'ContextGenome') -> 'ContextGenome': #type: ignore
         new_genome = super(ContextGenome, self).crossover(other)
-        return ContextGenome(new_genome.nodes, new_genome.connections)
+        return ContextGenome(new_genome.nodes, new_genome.connections,
+                             new_genome.node_generator)
 
     def copy(self) -> 'ContextGenome': #type: ignore
         new_genome = super(ContextGenome, self).copy()
-        return ContextGenome(new_genome.nodes, new_genome.connections)
+        return ContextGenome(new_genome.nodes, new_genome.connections,
+                             new_genome.node_generator)
 
 
 SortedContextGenomes = NewType('SortedContextGenomes', List[ContextGenome])
@@ -121,6 +124,8 @@ class NEATEST(object):
         self.best_genome: ContextGenome
         self.population: List[ContextGenome]
 
+        self.node_generator = itertools.count(0, 1)
+
         self.data: List[Tuple[int, str, int, float]] = []
 
         if not comm.rank == 0:
@@ -139,30 +144,31 @@ class NEATEST(object):
         connections: List[Connection] = []
 
         # Input Nodes
-        input_nodes = [Node(-1, NodeType.INPUT, depth = 0.0)
+        input_nodes = [Node(next(self.node_generator), NodeType.INPUT, depth = 0.0)
                        for _ in range(self.input_size)]
         if self.bias:
-            input_nodes.append(Node(-1, NodeType.BIAS, value = 1.0,
+            input_nodes.append(Node(next(self.node_generator), NodeType.BIAS,
+                                    value = 1.0,
                                     depth = 0.0))
         layers.append(input_nodes)
 
         # Hidden Nodes
         for idx, hidden_layer in enumerate(hidden_layers):
             depth = 1 / (len(hidden_layers) + 1) * (idx + 1)
-            hidden_nodes = [Node(-1,
+            hidden_nodes = [Node(next(self.node_generator),
                                  NodeType.HIDDEN,
                                  self.hidden_activation,
                                  depth = depth)
                            for _ in range(hidden_layer)]
             if self.bias:
                 hidden_nodes.append(
-                    Node(-1,
+                    Node(next(self.node_generator),
                          NodeType.BIAS, value = 1.0,
                          depth = depth))
             layers.append(hidden_nodes)
 
         # Output Nodes
-        output_nodes = [Node(-1, NodeType.OUTPUT,
+        output_nodes = [Node(next(self.node_generator), NodeType.OUTPUT,
                              self.output_activation, depth = 1.0)
                         for _ in range(self.output_size)]
         layers.append(output_nodes)
@@ -178,7 +184,7 @@ class NEATEST(object):
                         weight=random.gauss(0.0, self.sigma))]
 
         nodes: List[Node] = functools.reduce(operator.iconcat, layers, [])
-        return ContextGenome(nodes, connections)
+        return ContextGenome(nodes, connections, self.node_generator)
 
     def create_population(self, hidden_layers) -> None:
         population: List[ContextGenome] = [self.random_genome(hidden_layers)]
@@ -345,17 +351,20 @@ class NEATEST(object):
                 save_path = os.path.abspath(os.path.join(folder, filename))
                 print(f'Saving checkpoint: {save_path}')
                 with open(os.path.join(folder, filename), 'wb') as output:
-                    pickle.dump(self.__dict__, output, -1)
+                    pickle.dump({'neatest': self.__dict__,
+                                 'random_state': random.getstate(),
+                                 'np_random_state': np.random.get_state()},
+                                output, -1)
 
     @classmethod
     def load_checkpoint(cls, filename: str) -> 'NEATEST':
         with open(filename, 'rb') as checkpoint:
-            cls_dict = pickle.load(checkpoint)
+            checkpoint_dict = pickle.load(checkpoint)
         neat = cls.__new__(cls)
-        neat.__dict__.update(cls_dict)
+        neat.__dict__.update(checkpoint_dict['neatest'])
         n_proc = MPI.COMM_WORLD.Get_size()
         assert not neat.n_networks % n_proc
         assert not neat.es_population % n_proc
-        np.random.set_state(neat.np_random_state)
-        random.setstate(neat.random_state)
+        random.setstate(checkpoint_dict['random_state'])
+        np.random.set_state(checkpoint_dict['np_random_state'])
         return neat

@@ -2,6 +2,7 @@ from typing import List, Any, Callable, Tuple
 import math
 import copy
 import random
+import itertools
 import pickle
 
 from .connection import Connection, align_connections
@@ -10,7 +11,9 @@ from .node import Node, NodeType, group_nodes
 from mpi4py import MPI #type: ignore
 
 class Genome(object):
-    def __init__(self, nodes: List['Node'], connections: List[Connection]):
+    def __init__(self, nodes: List['Node'], connections: List[Connection],
+                 node_generator: itertools.count):
+        self.node_generator = node_generator
         self.connections = connections
         self.nodes = nodes
 
@@ -58,7 +61,7 @@ class Genome(object):
         '''Add a node to a random connection and split the connection.'''
         idx = random.randint(0, len(self.connections)-1)
         self.connections[idx].enabled = False
-        new_node = Node(-1,
+        new_node = Node(next(self.node_generator),
                         NodeType.HIDDEN, activation)
         first_connection = Connection(in_node=self.connections[idx].in_node,
                                       out_node=new_node,
@@ -144,7 +147,7 @@ class Genome(object):
                                     nodes[nodes_dict[out_node]])
             new_connection.enabled = connection.enabled
             connections.append(new_connection)
-        new_genome = Genome(nodes, connections)
+        new_genome = Genome(nodes, connections, self.node_generator)
         return new_genome
 
     def crossover(self, other: 'Genome'):
@@ -233,7 +236,7 @@ def crossover(genome_1:Genome, genome_2:Genome) -> Genome:
                                 nodes[nodes_dict[out_node]])
         connection.enabled = enabled
         connections.append(connection)
-    new_genome = Genome(nodes, connections)
+    new_genome = Genome(nodes, connections, genome_1.node_generator)
     return new_genome
 
 def draw_genome(genome: Genome,
