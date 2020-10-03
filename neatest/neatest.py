@@ -375,9 +375,12 @@ class NEATEST(object):
         for gene_rate in self.gene_rates:
             gene_rate.value -= self.dominant_gene_delta
 
-        for i, connection in enumerate(genome.connections):
-            connection.weight.grad = -grads[i] #type: ignore
-            connection.dominant_gene_rate.value += 2 * self.dominant_gene_delta
+        idx = 0
+        for connection in genome.connections:
+            if connection.enabled:
+                connection.weight.grad = -grads[idx] #type: ignore
+                connection.dominant_gene_rate.value += 2 * self.dominant_gene_delta
+                idx += 1
 
         for gene_rate in self.gene_rates:
             gene_rate.value = min(0.6, max(0.4, gene_rate.value))

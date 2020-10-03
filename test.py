@@ -57,6 +57,6 @@ a.train(3)
 
 print(a.best_genome)
 a.best_genome.save('LunarLander.genome')
-print(agent.rollout(genome, render=True))
+print(agent.rollout(a.best_genome, render=True))
 
 agent.env.close()
