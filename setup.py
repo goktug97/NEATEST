@@ -3,12 +3,14 @@
 import os
 from setuptools import setup
 
+from neatest import VERSION
+
 directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='NEATEST',
-      version='1.0.0',
+      version=f'{VERSION.major}.{VERSION.minor}.{VERSION.patch}',
       description='Evolving Neural Networks through Augmenting Topologies with'
       'Evolution Strategy Training',
       author='Göktuğ Karakaşlı',
@@ -19,8 +21,7 @@ setup(name='NEATEST',
       packages = ['neatest'],
       classifiers=[
           "Programming Language :: Python :: 3",
-          "License :: OSI Approved :: MIT License",
-          "Operating System :: POSIX :: Linux",
+          "License :: OSI Approved :: MIT License"
       ],
       python_requires='>=3.6',
       include_package_data=True)

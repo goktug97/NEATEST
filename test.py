@@ -11,7 +11,7 @@ Array = Union[np.ndarray, np.generic]
 
 class Agent(neatest.Agent):
     def __init__(self):
-        self.env = gym.make('LunarLander-v2')
+        self.env = gym.make('CartPole-v1')
 
     def rollout(self, genome: neatest.Genome, render=False) -> float:
         total_reward: float = 0.0
@@ -32,11 +32,9 @@ SEED = 123
 agent.env.seed(SEED)
 agent.env.action_space.seed(SEED)
 
-optim = neatest.Adam(lr=0.01)
-
 a = neatest.NEATEST(
     agent,
-    optim,
+    neatest.Adam,
     n_networks = 128,
     es_population = 256,
     input_size = agent.env.observation_space.shape[0],
@@ -46,6 +44,8 @@ a = neatest.NEATEST(
     dominant_gene_delta = 0.05,
     elite_rate = 0.05,
     sigma = 0.01,
+    save_checkpoint_n = 50,
+    optimizer_kwargs = {'lr': 0.01},
     disable_connection_mutation_rate = 0.3,
     seed = SEED,
     logdir = './logs/test',
@@ -53,11 +53,10 @@ a = neatest.NEATEST(
     node_mutation_rate = 0.3,
     connection_mutation_rate = 0.3)
 
-a.train(73)
+a.train(3)
 
-print(agent.rollout(a.best_genome, render=True))
 print(a.best_genome)
-
 a.best_genome.save('LunarLander.genome')
+print(agent.rollout(genome, render=True))
 
 agent.env.close()

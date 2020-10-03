@@ -6,88 +6,34 @@ from itertools import chain, repeat, islice
 from .node import Node, NodeType
 
 
-class Connection(object):
-    connections: Dict['Connection', int] = {}
-    global_innovation: int = 0
-    weights: List[float] = []
-    dominant_gene_rates: List[float] = []
-    grads: List[float] = []
+class Weight():
+    def __init__(self, value):
+        self.value = value
+        self.grad = 0.0
 
-    def __init__(self, in_node: Node, out_node: Node, dominant_gene_rate: float = 0.0,
-                 weight: float = 1.0, dummy: bool = False):
+
+class GeneRate():
+    def __init__(self, value):
+        self.value = value
+
+
+class Connection(object):
+
+    def __init__(self, in_node: Node, out_node: Node, innovation: int = -1,
+                 dominant_gene_rate: float = GeneRate(0.0),
+                 weight: float = Weight(1.0), dummy: bool = False):
         self.in_node = in_node
         self.out_node = out_node
         self.enabled = True
         self.dummy = dummy
+        self.innovation = innovation
+        self.dominant_gene_rate = dominant_gene_rate
+        self.weight = weight
         if dummy: return
-        self.innovation = Connection.register_connection(
-            self, weight, dominant_gene_rate)
         self.out_node.inputs.append(self)
-
-        self.detached: bool = False
-        self.detached_weight: float = 0.0
-        self.detached_dominant_gene_rate: float = 0.0
 
     def __gt__(self, other):
         return self.innovation > other.innovation
-
-    def detach(self) -> None:
-        self.detached = True
-        self.detached_weight = self.weights[self.innovation]
-        self.detached_dominant_gene_rate = self.dominant_gene_rates[self.innovation]
-
-    def attach(self) -> None:
-        self.detached = False
-
-    @property
-    def weight(self) -> float:
-        if not self.detached:
-            return self.weights[self.innovation]
-        else:
-            return self.detached_weight
-
-    @weight.setter
-    def weight(self, value: float) -> None:
-        if not self.detached:
-            self.weights[self.innovation] = value
-        else:
-            self.detached_weight = value
-
-    @property
-    def grad(self) -> float:
-        return self.grads[self.innovation]
-
-    @grad.setter
-    def grad(self, value: float) -> None:
-        self.grads[self.innovation] = value
-
-    @property
-    def dominant_gene_rate(self) -> float:
-        if not self.detached:
-            return self.dominant_gene_rates[self.innovation]
-        else:
-            return self.detached_dominant_gene_rate
-
-    @dominant_gene_rate.setter
-    def dominant_gene_rate(self, value: float) -> None:
-        if not self.detached:
-            self.dominant_gene_rates[self.innovation] = value
-        else:
-            self.detached_dominant_gene_rate = value
-
-    @classmethod
-    def register_connection(cls, new_connection:'Connection', weight: float,
-                            dominant_gene_rate: float) -> int:
-        if new_connection in cls.connections:
-            return cls.connections[new_connection]
-        else:
-            cls.weights.append(weight)
-            cls.grads.append(0.0)
-            cls.dominant_gene_rates.append(dominant_gene_rate)
-            innovation = cls.global_innovation
-            cls.global_innovation += 1
-            cls.connections[new_connection] = innovation
-            return innovation
 
     def __hash__(self):
         return hash(str(self.in_node.id)+str(self.out_node.id))
@@ -104,8 +50,8 @@ class Connection(object):
 
     def __str__(self):
         string = f'{self.in_node.id} -> {self.out_node.id} '
-        string = f'{string}Weight: {self.weight:.3f} '
-        string = f'{string}Dominant Gene Rate: {self.dominant_gene_rate:.3f} '
+        string = f'{string}Weight: {self.weight.value:.3f} '
+        string = f'{string}Dominant Gene Rate: {self.dominant_gene_rate.value:.3f} '
         if self.dummy:
             string = f'{string}Innovation No: Dummy '
         else:
@@ -148,3 +94,7 @@ def align_connections(
         values = [next(i) if v == smallest else v
                   for i, v in zip(iterators, values)]
     return connections_1, connections_2
+
+class DummyConnection(Connection):
+    def __init__(self, in_node: Node, out_node: Node):
+        super().__init__(in_node, out_node, dummy=True)
