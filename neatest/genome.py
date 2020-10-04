@@ -20,20 +20,14 @@ class Genome(object):
         self.output_size = len(grouped_nodes[-1])
         self.outputs = grouped_nodes[-1]
 
-    @property
-    def size(self) -> int:
-        return len(list(filter(lambda x: x.enabled, self.connections)))
-
-    def reset_values(self) -> None:
-        for node in self.nodes:
-            node.value = 0.0
-
     def __call__(self, inputs: List[float]) -> List[float]:
         self.nodes.sort(key=lambda x: x.depth)
         for node in self.nodes:
             value = 0.0
             if node.type == NodeType.INPUT:
                 value += inputs[node.id]
+            elif node.type == NodeType.BIAS:
+                continue
             for connection in node.inputs:
                 if connection.enabled:
                     value += connection.in_node.value * connection.weight.value

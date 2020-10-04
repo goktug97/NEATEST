@@ -362,7 +362,6 @@ class NEATEST(object):
         for i in range(comm.rank*n_jobs, n_jobs * (comm.rank + 1)):
             for j, connection in enumerate(cp_genome.connections):
                 connection.weight = Weight(population_weights[i, j]) #type: ignore
-            cp_genome.reset_values()
             rewards.append(self.agent.rollout(cp_genome))
         comm.Allgather([np.array(rewards, dtype=np.float64), MPI.DOUBLE],
                             [rewards_array, MPI.DOUBLE])
@@ -392,7 +391,6 @@ class NEATEST(object):
             rewards = []
             for genome in self.population[
                     comm.rank*n_jobs: n_jobs * (comm.rank + 1)]:
-                genome.reset_values()
                 reward = self.agent.rollout(genome)
                 rewards.append(reward)
             rewards = functools.reduce(

@@ -71,7 +71,7 @@ def align_connections(
             List[Connection],
             List[Connection]]:
     dummy_node = Node(0, NodeType.HIDDEN)
-    dummy_connection = Connection(dummy_node, dummy_node, dummy=True)
+    dummy_connection = DummyConnection(dummy_node, dummy_node)
     end = dummy_connection
     iterators = [chain(i, [end]) for i in [sorted(connections_1),
         sorted(connections_2)]]
@@ -83,7 +83,7 @@ def align_connections(
         alignment = []
         match = True
         for v in values:
-            if v == smallest:
+            if v.innovation == smallest.innovation:
                 alignment.append(v)
             else:
                 match = False
@@ -91,7 +91,7 @@ def align_connections(
         connection_1, connection_2 = alignment
         connections_1.append(connection_1)
         connections_2.append(connection_2)
-        values = [next(i) if v == smallest else v
+        values = [next(i) if v.innovation == smallest.innovation else v
                   for i, v in zip(iterators, values)]
     return connections_1, connections_2
 
