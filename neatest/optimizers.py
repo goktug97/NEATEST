@@ -8,6 +8,8 @@ from .connection import Connection, Weight
 Array = Union[np.ndarray, np.generic]
 
 class Optimizer(ABC):
+    def __init__(self, weights: List[Weight], **kwargs):
+        self.weights = weights
 
     def zero_grad(self) -> None:
         for i in range(len(self.weights)):

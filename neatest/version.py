@@ -4,7 +4,7 @@ class Version():
         self.minor: int = 0
         self.patch: int = 1
 
-    def __eq__(self, other: 'Version') -> bool:
+    def __eq__(self, other) -> bool:
         return (self.major == other.major and
                 self.minor == other.minor and
                 self.patch == other.patch)

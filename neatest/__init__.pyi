@@ -1,16 +1,21 @@
 from abc import ABC, abstractmethod
-from typing import Union, List, Callable, Tuple, NewType, Type
+from typing import Union, List, Callable, Tuple, NewType, Type, Dict
 from enum import Enum
 import functools
+import random
 
 import numpy as np
 
 Array = Union[np.ndarray, np.generic]
 
-class Comm():
-    rank: int
+class Version():
+    major: int
+    minor: int
+    patch: int
+    def __init__(self):
+        ...
 
-    def Get_size(self) -> int:
+    def __eq__(self, other) -> bool:
         ...
 
 @functools.lru_cache(maxsize=1)
@@ -26,7 +31,7 @@ def rank_transformation(rewards: Union[List[float], Array]) -> Array:
 @functools.total_ordering
 class NodeType(Enum):
     def __gt__(self, other: NodeType) -> bool:
-        return self.value > other.value
+        ...
 
 def passthrough(x: float) -> float:
     ...
@@ -53,17 +58,6 @@ class Node():
                  depth: float = ...):
         ...
 
-    @property
-    def value(self) -> float:
-        ...
-
-    @value.setter
-    def value(self, value: float) -> None:
-        ...
-
-    def reset_values(self) -> None:
-        ...
-
     def __hash__(self) -> int:
         ...
 
@@ -82,51 +76,21 @@ class Node():
 def group_nodes(nodes: List[Node], by: str) -> List[List[Node]]:
     ...
 
-class Connection(object):
-    detached: bool = False
-    detached_weight: float
-    detached_dominant_gene_rate: float
+class Weight():
+    grad: float
+    def __init__(self, value: float):
+        ...
 
-    def __init__(self, in_node: Node, out_node: Node, dominant_gene_rate: float = ...,
-                 weight: float = ..., dummy: bool = ...):
+class GeneRate():
+    def __init__(self, value: float):
+        ...
+
+class Connection(object):
+    def __init__(self, in_node: Node, out_node: Node, dominant_gene_rate: GeneRate = ...,
+                 weight: Weight = ..., dummy: bool = ...):
         ...
 
     def __gt__(self, other: 'Connection') -> bool:
-        ...
-
-    def detach(self) -> None:
-        ...
-
-    def attach(self) -> None:
-        ...
-
-    @property
-    def weight(self) -> float:
-        ...
-
-    @weight.setter
-    def weight(self, value: float) -> None:
-        ...
-
-    @property
-    def grad(self) -> float:
-        ...
-
-    @grad.setter
-    def grad(self, value: float) -> None:
-        ...
-
-    @property
-    def dominant_gene_rate(self) -> float:
-        ...
-
-    @dominant_gene_rate.setter
-    def dominant_gene_rate(self, value: float) -> None:
-        ...
-
-    @classmethod
-    def register_connection(cls, new_connection:'Connection', weight: float,
-                            dominant_gene_rate: float) -> int:
         ...
 
     def __hash__(self) -> int:
@@ -151,41 +115,30 @@ def align_connections(
             List[Connection]]:
     ...
 
+class DummyConnection(Connection):
+    def __init__(self, in_node: Node, out_node: Node):
+        ...
+
 class Genome(object):
-    connections: List[Connection]
-    nodes: List[Node]
+    input_size: int
+    output_size: int
+    outputs: List[List[Node]]
+    version: Version
 
     def __init__(self, nodes: List['Node'], connections: List[Connection]):
         ...
 
-    def add_connection_mutation(self, sigma: float, dominant_gene_rate: float) -> None:
-        ...
-
-    def add_node_mutation(self,
-                          dominant_gene_rate: float,
-                          activation: Callable[[float], float]=...) -> None:
-        ...
-
-    def disable_connection_mutation(self) -> None:
-        ...
-
     def __call__(self, inputs: List[float]) -> List[float]:
-        ...
-
-    def detach(self) -> None:
-        ...
-
-    def attach(self) -> None:
         ...
 
     @property
     def size(self) -> int:
         ...
 
-    def copy(self) -> 'Genome':
+    def deepcopy(self) -> 'Genome':
         ...
 
-    def crossover(self, other: 'Genome') -> 'Genome':
+    def copy(self) -> 'Genome':
         ...
 
     def draw(self, node_radius: float = ...,
@@ -203,9 +156,6 @@ class Genome(object):
     def __str__(self) -> str:
         ...
 
-def crossover(genome_1:Genome, genome_2:Genome) -> Genome:
-    ...
-
 def draw_genome(genome: Genome,
                 node_radius: float = ...,
                 vertical_distance: float = ...,
@@ -216,18 +166,19 @@ class ContextGenome(Genome):
     def __init__(self, nodes: List[Node], connections: List[Connection]) -> None:
         ...
 
-    def crossover(self, other: ContextGenome) -> ContextGenome: #type: ignore
+    def copy(self) -> 'ContextGenome': #type: ignore
         ...
 
-    def copy(self) -> 'ContextGenome': #type: ignore
+    def deepcopy(self) -> 'ContextGenome': #type: ignore
         ...
 
 SortedContextGenomes = NewType('SortedContextGenomes', List[ContextGenome])
 
 class Optimizer(ABC):
+    def __init__(self, weights: List[Weight], **kwargs):
+        ...
 
-    @staticmethod
-    def zero_grad() -> None:
+    def zero_grad(self) -> None:
         ...
 
     @abstractmethod
@@ -240,8 +191,11 @@ class Agent(ABC):
         ...
 
 class Adam(Optimizer):
-    def __init__(self, lr: float, beta_1: float = ..., beta_2:
-                 float = ..., epsilon: float = ...):
+    m: Array
+    v: Array
+    t: int
+    def __init__(self, weights: List[Weight], lr: float, beta_1: float = ...,
+                 beta_2: float = ..., epsilon: float = ...):
         ...
 
     def step(self) -> None:
@@ -250,12 +204,21 @@ class Adam(Optimizer):
 class NEATEST(object):
     population: List[ContextGenome]
     generation: int
+    connections: Dict[Connection, int]
     best_fitness: float
     best_genome: ContextGenome
+    version: Version
+    n_proc: int
+    random: random.Random
+    np_random: np.random.mtrand.RandomState
+    weights: List[Weight]
+    gene_rates: List[GeneRate]
+    optimizer: Optimizer
+    data: List[Tuple[int, str, int, float]]
 
     def __init__(self,
                  agent: Agent,
-                 optimizer: Optimizer,
+                 optimizer: Type[Optimizer],
                  n_networks: int,
                  es_population: int,
                  input_size: int,
@@ -267,7 +230,9 @@ class NEATEST(object):
                  dominant_gene_rate: float,
                  dominant_gene_delta: float,
                  seed: int,
+                 save_checkpoint_n: int = ...,
                  logdir: str = ...,
+                 optimizer_kwargs: dict = ...,
                  hidden_layers: List[int] = ...,
                  elite_rate: float = ...,
                  sigma: float = ...,
@@ -277,12 +242,31 @@ class NEATEST(object):
         ...
 
 
+    def register_connection(self, dummy_connection: DummyConnection):
+        ...
+
+    def add_connection_mutation(self, genome: Genome) -> None:
+        ...
+
+    def add_node_mutation(self, genome: Genome,
+                          activation: Callable[[float], float]=...) -> None:
+        ...
+
+    def disable_connection_mutation(self, genome: Genome) -> None:
+        ...
+
+    def crossover(self, genome_1:Genome, genome_2:Genome) -> Genome:
+        ...
+
     def random_genome(self) -> ContextGenome:
         ...
 
     def create_population(self) -> None:
         ...
 
+    def save_logs(self) -> None:
+        ...
+ 
     def next_generation(self, sorted_population: SortedContextGenomes) -> None:
         ...
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import random
 import copy
-from typing import Union, List, Callable, Tuple, NewType
+from typing import Union, List, Callable, Tuple, NewType, Dict, Type
 import itertools
 import functools
 import math
@@ -16,7 +16,7 @@ import inspect
 
 import numpy as np
 from mpi4py import MPI #type: ignore
-import cloudpickle
+import cloudpickle #type: ignore
 
 from .genome import Genome
 from .node import Node, NodeType
@@ -75,7 +75,7 @@ class Agent(ABC):
 class NEATEST(object):
     def __init__(self,
                  agent: Agent,
-                 optimizer: Optimizer,
+                 optimizer: Type[Optimizer],
                  n_networks: int,
                  es_population: int,
                  input_size: int,
@@ -89,7 +89,7 @@ class NEATEST(object):
                  seed: int,
                  save_checkpoint_n: int = 50,
                  logdir: str = None,
-                 optimizer_kwargs = {},
+                 optimizer_kwargs: dict = {},
                  hidden_layers: List[int] = [],
                  elite_rate: float = 0.0,
                  sigma: float = 0.01,
@@ -123,13 +123,13 @@ class NEATEST(object):
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
 
-        self.weights = []
-        self.gene_rates = []
-        self.connections = {}
+        self.weights: List[Weight] = []
+        self.gene_rates: List[GeneRate] = []
+        self.connections: Dict[Connection, int] = {}
         self.node_id_generator = itertools.count(0, 1)
         self.connection_id_generator = itertools.count(0, 1)
 
-        self.optimizer = optimizer(self.weights, **optimizer_kwargs)
+        self.optimizer: Optimizer = optimizer(self.weights, **optimizer_kwargs)
 
         self.generation: int = 0
         self.best_fitness: float = -float('inf')
@@ -431,7 +431,7 @@ class NEATEST(object):
             self.calculate_grads(genome)
             self.optimizer.step()
 
-    def crossover(self, genome_1:Genome, genome_2:Genome) -> Genome:
+    def crossover(self, genome_1:Genome, genome_2:Genome) -> ContextGenome:
         '''Crossover two genomes by aligning their innovation numbers.'''
         connections: List[Connection] = []
         nodes: List[Node] = []
@@ -489,7 +489,7 @@ class NEATEST(object):
                                     dominant_gene_rate = connection.dominant_gene_rate)
             connection.enabled = enabled
             connections.append(connection)
-        new_genome = Genome(nodes, connections)
+        new_genome = ContextGenome(nodes, connections)
         return new_genome
 
     def save_logs(self):

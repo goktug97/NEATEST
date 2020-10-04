@@ -20,8 +20,8 @@ class GeneRate():
 class Connection(object):
 
     def __init__(self, in_node: Node, out_node: Node, innovation: int = -1,
-                 dominant_gene_rate: float = GeneRate(0.0),
-                 weight: float = Weight(1.0), dummy: bool = False):
+                 dominant_gene_rate: GeneRate = GeneRate(0.0),
+                 weight: Weight = Weight(1.0), dummy: bool = False):
         self.in_node = in_node
         self.out_node = out_node
         self.enabled = True

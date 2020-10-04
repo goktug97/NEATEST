@@ -32,7 +32,7 @@ class NodeType(Enum):
     HIDDEN = 3
     OUTPUT = 4
 
-    def __gt__(self, other):
+    def __gt__(self, other) -> bool:
         return self.value > other.value
 
 

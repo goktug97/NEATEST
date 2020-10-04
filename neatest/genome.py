@@ -5,7 +5,7 @@ from .connection import Connection, GeneRate, Weight
 from .node import Node, NodeType, group_nodes
 from .version import VERSION
 
-import cloudpickle
+import cloudpickle #type: ignore
 from mpi4py import MPI #type: ignore
 
 
