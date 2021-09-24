@@ -26,3 +26,8 @@ gym # For examples
 
 # Usage
 Check [examples](https://github.com/goktug97/NEATEST/tree/master/examples)
+```
+PYTHONPATH="$(pwd):$PYTHONPATH" python examples/cartpole.py
+# Or in parallel
+PYTHONPATH="$(pwd):$PYTHONPATH" mpirun -np 2 python examples/cartpole.py
+```
