@@ -25,5 +25,4 @@ gym # For examples
 ```
 
 # Usage
-Check https://github.com/goktug97/NEATEST/examples
-
+Check [examples](https://github.com/goktug97/NEATEST/tree/master/examples)
