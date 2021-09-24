@@ -9,7 +9,7 @@ directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-setup(name='NEATEST',
+setup(name='nesneat',
       version=f'{VERSION.major}.{VERSION.minor}.{VERSION.patch}',
       description='Evolving Neural Networks through Augmenting Topologies with'
       'Evolution Strategy Training',

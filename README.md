@@ -12,6 +12,11 @@ numpy
 cloudpickle
 ```
 
+# Install
+```
+pip install nesneat
+```
+
 ## Optional
 ```
 matplotlib # To draw networks
