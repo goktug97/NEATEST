@@ -1,12 +1,10 @@
-class Version():
-    def __init__(self):
-        self.major: int = 1
-        self.minor: int = 0
-        self.patch: int = 4
+from dataclasses import dataclass
 
-    def __eq__(self, other) -> bool:
-        return (self.major == other.major and
-                self.minor == other.minor and
-                self.patch == other.patch)
+
+@dataclass(frozen=True)
+class Version():
+    major: int = 1
+    minor: int = 0
+    patch: int = 5
 
 VERSION: Version = Version()

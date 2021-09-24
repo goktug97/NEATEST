@@ -30,10 +30,6 @@ class MPI():
         return [reward]
 
     @staticmethod
-    def allgatherv(reward):
-        return [reward]
-
-    @staticmethod
     def Get_rank():
         return 0
 

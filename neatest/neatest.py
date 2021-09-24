@@ -403,7 +403,7 @@ class NEATEST(object):
                 reward = self.agent.rollout(genome)
                 rewards.append(reward)
             rewards = functools.reduce(
-                operator.iconcat, comm.allgatherv(rewards), [])
+                operator.iconcat, comm.allgather(rewards), [])
 
             for idx, reward in enumerate(rewards):
                 self.population[idx].fitness = reward
