@@ -6,6 +6,10 @@ class MPI():
         return np.float32
 
     @property
+    def DOUBLE(self):
+        return np.float64
+
+    @property
     def COMM_WORLD(self):
         return self
 
@@ -23,7 +27,11 @@ class MPI():
 
     @staticmethod
     def allgather(reward):
-        return reward
+        return [reward]
+
+    @staticmethod
+    def allgatherv(reward):
+        return [reward]
 
     @staticmethod
     def Get_rank():
