@@ -4,7 +4,7 @@ NEATEST: Evolving Neural Networks Through Augmenting Topologies with Evolution S
 It is NEAT but the weights are trained with Natural Evolution Strategy and
 the weights are shared across genomes.
 
-![](videos/DoubleInvertedPendulum.gif) ![](videos/LunarLander.gif)
+![](videos/DoubleInvertedPendulum.gif) ![](videos/LunarLander.gif) ![](videos/LunarLander2.gif)
 
 # Requirements
 ```
