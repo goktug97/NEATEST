@@ -53,7 +53,7 @@ a = neatest.NEATEST(
     node_mutation_rate = 0.3,
     connection_mutation_rate = 0.3)
 
-a.train(3)
+a.train(10)
 
 print(a.best_genome)
 a.best_genome.save('LunarLander.genome')
