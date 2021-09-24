@@ -35,7 +35,7 @@ class NodeType(Enum):
     def __gt__(self, other) -> bool:
         return self.value > other.value
 
-
+@functools.total_ordering
 class Node(object):
     def __init__(self, id: int, type: NodeType,
                  activation: Callable[[float], float] = passthrough,
@@ -59,6 +59,18 @@ class Node(object):
             return self.id == other.id
         else:
             raise ValueError(f'Value type should be Node, got {type(other)}')
+
+    def __lt__(self, other):
+        if isinstance(other, Node):
+            return self.id < other.id
+        else:
+            raise ValueError(f'Value type should be Node, got {type(other)}')
+
+    def __add__(self, other):
+        if isinstance(other, Node):
+            return self.id + other.id
+        else:
+            return self.id + other
 
     def copy(self):
         return copy.deepcopy(self)

@@ -23,5 +23,9 @@ setup(name='NEATEST',
           "Programming Language :: Python :: 3",
           "License :: OSI Approved :: MIT License"
       ],
+      install_requires=[
+          'numpy',
+          'cloudpickle'
+      ],
       python_requires='>=3.6',
       include_package_data=True)

@@ -1,12 +1,20 @@
 from typing import List, Any, Callable, Tuple
 import math
+import os
 
 from .connection import Connection, GeneRate, Weight
 from .node import Node, NodeType, group_nodes
 from .version import VERSION
 
 import cloudpickle #type: ignore
-from mpi4py import MPI #type: ignore
+try:
+    disable_mpi = os.environ.get('NEATEST_DISABLE_MPI')
+    if disable_mpi and disable_mpi != '0':
+        raise ImportError
+    from mpi4py import MPI
+except ImportError:
+    from .MPI import MPI
+    MPI = MPI()
 
 
 class Genome(object):

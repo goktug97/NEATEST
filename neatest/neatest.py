@@ -14,8 +14,15 @@ import time
 import pathlib
 import inspect
 
+try:
+    disable_mpi = os.environ.get('NEATEST_DISABLE_MPI')
+    if disable_mpi and disable_mpi != '0':
+        raise ImportError
+    from mpi4py import MPI
+except ImportError:
+    from .MPI import MPI
+    MPI = MPI()
 import numpy as np
-from mpi4py import MPI #type: ignore
 import cloudpickle #type: ignore
 
 from .genome import Genome
@@ -51,7 +58,7 @@ class ContextGenome(Genome):
     '''Genome class that holds data which depends on the context.'''
     def __init__(self, nodes: List[Node], connections: List[Connection]):
         self.fitness: float = 0.0
-        self.generation: int = 0
+        self.generation: int = 1
         super().__init__(nodes, connections)
 
     def copy(self) -> 'ContextGenome': #type: ignore
@@ -100,8 +107,8 @@ class NEATEST(object):
         self.version = VERSION
         n_proc = comm.Get_size()
         self.n_proc = n_proc
-        assert not n_networks % n_proc
-        assert not es_population % n_proc
+        # assert not n_networks % n_proc
+        # assert not es_population % n_proc
         self.seed = seed;
         self.random = random.Random(seed)
         self.np_random = np.random.RandomState(seed)
@@ -131,7 +138,7 @@ class NEATEST(object):
 
         self.optimizer: Optimizer = optimizer(self.weights, **optimizer_kwargs)
 
-        self.generation: int = 0
+        self.generation: int = 1
         self.best_fitness: float = -float('inf')
         self.best_genome: ContextGenome
         self.population: List[ContextGenome]
@@ -149,7 +156,7 @@ class NEATEST(object):
         self.create_population(hidden_layers)
 
     def random_genome(self, hidden_layers) -> ContextGenome:
-        '''Create fc neural network without hidden layers with random weights.'''
+        '''Create fc neural network with random weights.'''
         layers = []
         connections: List[Connection] = []
 
@@ -264,7 +271,9 @@ class NEATEST(object):
         '''Add a node to a random connection and split the connection.'''
         idx = self.random.randint(0, len(genome.connections)-1)
         genome.connections[idx].enabled = False
-        new_node = Node(next(self.node_id_generator), NodeType.HIDDEN, activation)
+
+        # new_node = Node(next(self.node_id_generator), NodeType.HIDDEN, activation)
+        new_node = Node(max(genome.nodes) + 1, NodeType.HIDDEN, activation)
 
         first_weight = Weight(1.0)
         first_gene_rate = GeneRate(self.dominant_gene_rate)
@@ -363,7 +372,7 @@ class NEATEST(object):
             for j, connection in enumerate(cp_genome.connections):
                 connection.weight = Weight(population_weights[i, j]) #type: ignore
             rewards.append(self.agent.rollout(cp_genome))
-        comm.Allgather([np.array(rewards, dtype=np.float64), MPI.DOUBLE],
+        comm.Allgatherv([np.array(rewards, dtype=np.float64), MPI.DOUBLE],
                             [rewards_array, MPI.DOUBLE])
         ranked_rewards: Array = rank_transformation(rewards_array)
         epsilon = np.concatenate([epsilon, -epsilon])
@@ -414,6 +423,7 @@ class NEATEST(object):
             print(f'Rollout Reward: {reward}')
             print(f'Max Reward Session: {self.best_fitness}')
             print(f'Max Reward in Population: {max(rewards)}')
+
             if self.generation and not self.generation % self.save_checkpoint_n:
                 self.save_checkpoint()
 
@@ -540,8 +550,8 @@ class NEATEST(object):
                 from pathlib import Path
                 Path(neatest.logdir).mkdir(parents=True, exist_ok=True)
         n_proc = comm.Get_size()
-        assert not neatest.n_networks % n_proc
-        assert not neatest.es_population % n_proc
+        # assert not neatest.n_networks % n_proc
+        # assert not neatest.es_population % n_proc
         if neatest.n_proc != n_proc:
             print("\033[31;1mWarning: Number of process mismatch\033[0m")
         if neatest.version != VERSION:
