@@ -48,7 +48,7 @@ a = neatest.NEATEST(
     optimizer_kwargs = {'lr': 0.01},
     disable_connection_mutation_rate = 0.3,
     seed = SEED,
-    logdir = './logs/test',
+    # logdir = './logs/test',
     hidden_activation=neatest.relu,
     node_mutation_rate = 0.3,
     connection_mutation_rate = 0.3)
@@ -56,7 +56,7 @@ a = neatest.NEATEST(
 a.train(10)
 
 print(a.best_genome)
-a.best_genome.save('LunarLander.genome')
+a.best_genome.save('CartPole.genome')
 print(agent.rollout(a.best_genome, render=True))
 
 agent.env.close()
