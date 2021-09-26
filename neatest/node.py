@@ -1,25 +1,31 @@
 import functools
-from itertools import groupby, count
-from typing import Callable, Union, List, TYPE_CHECKING
+from itertools import groupby
+from typing import Callable, List, TYPE_CHECKING
 import copy
 from enum import Enum
 
 import numpy as np
 
+
 def passthrough(x):
     return x
+
 
 def sigmoid(x: float) -> float:
     return 1 / (1 + np.exp(-x))
 
+
 def steepened_sigmoid(x: float) -> float:
     return 1 / (1 + np.exp(-4.9 * x))
+
 
 def relu(x: float) -> float:
     return max(x, 0.0)
 
-def leaky_relu(x: float) -> float:
-    return max(0.1*x, x)
+
+def leaky_relu(x: float, negative_slope: float = 0.01) -> float:
+    return max(negative_slope*x, x)
+
 
 def tanh(x: float) -> float:
     return float(np.tanh(x))
@@ -34,6 +40,7 @@ class NodeType(Enum):
 
     def __gt__(self, other) -> bool:
         return self.value > other.value
+
 
 @functools.total_ordering
 class Node(object):
@@ -83,7 +90,7 @@ class Node(object):
 
 
 def group_nodes(nodes: List[Node], by) -> List[List[Node]]:
-    sorted_nodes = sorted(nodes, key = lambda x: getattr(x, by))
+    sorted_nodes = sorted(nodes, key=lambda x: getattr(x, by))
     grouped_nodes = [list(it) for k, it in groupby(
         sorted_nodes, lambda x: getattr(x, by))]
     return grouped_nodes

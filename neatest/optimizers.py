@@ -3,7 +3,8 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from .connection import Connection, Weight
+from .connection import Weight
+
 
 Array = Union[np.ndarray, np.generic]
 
@@ -50,4 +51,3 @@ class Adam(Optimizer):
         assert step.size == len(self.weights)
         for i in range(len(self.weights)):
             self.weights[i].value += step[i]
-

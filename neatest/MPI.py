@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class MPI():
     @property
     def FLOAT(self):

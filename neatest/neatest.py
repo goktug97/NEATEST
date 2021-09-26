@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 import random
-import copy
 from typing import Union, List, Callable, Tuple, NewType, Dict, Type
 import itertools
 import functools
-import math
-import statistics
 from abc import ABC, abstractmethod
 import operator
 import os
@@ -23,18 +20,17 @@ except ImportError:
     from .MPI import MPI
     MPI = MPI()
 import numpy as np
-import cloudpickle #type: ignore
+import cloudpickle  # type: ignore
 
 from .genome import Genome
-from .node import Node, NodeType
-from .node import sigmoid, steepened_sigmoid
-from .node import relu, leaky_relu
-from .node import tanh, passthrough
+from .node import Node, NodeType, passthrough
 from .connection import Connection, Weight, GeneRate, DummyConnection, align_connections
 from .optimizers import Optimizer
 from .version import VERSION
 
+
 Array = Union[np.ndarray, np.generic]
+
 
 @functools.lru_cache(maxsize=1)
 def _center_function(population_size: int) -> Array:
@@ -43,16 +39,19 @@ def _center_function(population_size: int) -> Array:
     centers -= 0.5
     return centers
 
+
 def _compute_ranks(rewards: Union[List[float], Array]) -> Array:
     rewards = np.array(rewards)
     ranks = np.empty(rewards.size, dtype=int)
     ranks[rewards.argsort()] = np.arange(rewards.size)
     return ranks
 
+
 def rank_transformation(rewards: Union[List[float], Array]) -> Array:
     ranks = _compute_ranks(rewards)
     values = _center_function(len(rewards))
-    return values[ranks] #type: ignore
+    return values[ranks]  # type: ignore
+
 
 class ContextGenome(Genome):
     '''Genome class that holds data which depends on the context.'''
@@ -61,11 +60,11 @@ class ContextGenome(Genome):
         self.generation: int = 1
         super().__init__(nodes, connections)
 
-    def copy(self) -> 'ContextGenome': #type: ignore
+    def copy(self) -> 'ContextGenome':  # type: ignore
         new_genome = super(ContextGenome, self).copy()
         return ContextGenome(new_genome.nodes, new_genome.connections)
 
-    def deepcopy(self) -> 'ContextGenome': #type: ignore
+    def deepcopy(self) -> 'ContextGenome':  # type: ignore
         new_genome = super(ContextGenome, self).deepcopy()
         return ContextGenome(new_genome.nodes, new_genome.connections)
 
@@ -100,8 +99,8 @@ class NEATEST(object):
                  hidden_layers: List[int] = [],
                  elite_rate: float = 0.0,
                  sigma: float = 0.01,
-                 hidden_activation: Callable[[float], float]=passthrough,
-                 output_activation: Callable[[float], float]=passthrough):
+                 hidden_activation: Callable[[float], float] = passthrough,
+                 output_activation: Callable[[float], float] = passthrough):
 
         comm = MPI.COMM_WORLD
         self.version = VERSION
@@ -109,7 +108,7 @@ class NEATEST(object):
         self.n_proc = n_proc
         # assert not n_networks % n_proc
         # assert not es_population % n_proc
-        self.seed = seed;
+        self.seed = seed
         self.random = random.Random(seed)
         self.np_random = np.random.RandomState(seed)
         self.logdir = logdir
@@ -161,12 +160,11 @@ class NEATEST(object):
         connections: List[Connection] = []
 
         # Input Nodes
-        input_nodes = [Node(next(self.node_id_generator), NodeType.INPUT, depth = 0.0)
+        input_nodes = [Node(next(self.node_id_generator), NodeType.INPUT, depth=0.0)
                        for _ in range(self.input_size)]
         if self.bias:
             input_nodes.append(Node(next(self.node_id_generator), NodeType.BIAS,
-                                    value = 1.0,
-                                    depth = 0.0))
+                                    value=1.0, depth=0.0))
         layers.append(input_nodes)
 
         # Hidden Nodes
@@ -175,18 +173,17 @@ class NEATEST(object):
             hidden_nodes = [Node(next(self.node_id_generator),
                                  NodeType.HIDDEN,
                                  self.hidden_activation,
-                                 depth = depth)
-                           for _ in range(hidden_layer)]
+                                 depth=depth)
+                            for _ in range(hidden_layer)]
             if self.bias:
                 hidden_nodes.append(
                     Node(next(self.node_id_generator),
-                         NodeType.BIAS, value = 1.0,
-                         depth = depth))
+                         NodeType.BIAS, value=1.0, depth=depth))
             layers.append(hidden_nodes)
 
         # Output Nodes
         output_nodes = [Node(next(self.node_id_generator), NodeType.OUTPUT,
-                             self.output_activation, depth = 1.0)
+                             self.output_activation, depth=1.0)
                         for _ in range(self.output_size)]
         layers.append(output_nodes)
 
@@ -201,7 +198,7 @@ class NEATEST(object):
 
                     connections += [Connection(
                         in_node=input_node, out_node=output_node,
-                        innovation = innovation,
+                        innovation=innovation,
                         dominant_gene_rate=dominant_gene_rate,
                         weight=weight)]
 
@@ -230,7 +227,7 @@ class NEATEST(object):
 
     def add_connection_mutation(self, genome: Genome) -> None:
         '''Create new connection between two random non-connected nodes.'''
-        def _add_connection_mutation(depth = 0):
+        def _add_connection_mutation(depth=0):
             if depth > 20:
                 return
             in_idx = self.random.randint(0, len(genome.nodes) - 1)
@@ -242,7 +239,7 @@ class NEATEST(object):
                 index = genome.connections.index(dummy_connection)
                 if not genome.connections[index].enabled:
                     if (self.random.random() <=
-                        genome.connections[index].dominant_gene_rate.value):
+                            genome.connections[index].dominant_gene_rate.value):
                         genome.connections[index].enabled = True
                         return
                 else:
@@ -252,22 +249,22 @@ class NEATEST(object):
                 pass
 
             if (out_node.type == NodeType.BIAS or
-                out_node.type == NodeType.INPUT or
-                in_node.type == NodeType.OUTPUT):
+                    out_node.type == NodeType.INPUT or
+                    in_node.type == NodeType.OUTPUT):
                 _add_connection_mutation(depth+1)
                 return
             innovation, weight, dominant_gene_rate = self.register_connection(
                 dummy_connection)
 
             connection = Connection(in_node=in_node, out_node=out_node,
-                                    innovation = innovation,
+                                    innovation=innovation,
                                     dominant_gene_rate=dominant_gene_rate,
                                     weight=weight)
             genome.connections.append(connection)
         _add_connection_mutation()
 
     def add_node_mutation(self, genome: Genome,
-                          activation: Callable[[float], float]=lambda x: x) -> None:
+                          activation: Callable[[float], float] = lambda x: x) -> None:
         '''Add a node to a random connection and split the connection.'''
         idx = self.random.randint(0, len(genome.connections)-1)
         genome.connections[idx].enabled = False
@@ -280,7 +277,7 @@ class NEATEST(object):
         first_innovation = next(self.connection_id_generator)
         first_connection = Connection(in_node=genome.connections[idx].in_node,
                                       out_node=new_node,
-                                      innovation = first_innovation,
+                                      innovation=first_innovation,
                                       dominant_gene_rate=first_gene_rate,
                                       weight=first_weight)
         self.weights.append(first_weight)
@@ -306,13 +303,13 @@ class NEATEST(object):
         genome.nodes.append(new_node)
 
     def disable_connection_mutation(self, genome: Genome) -> None:
-        def _disable_connection_mutation(depth = 0):
+        def _disable_connection_mutation(depth=0):
             if depth > 20:
                 return
             idx = self.random.randint(0, len(genome.connections)-1)
             if (genome.connections[idx].out_node.type == NodeType.OUTPUT or
-                genome.connections[idx].in_node.type == NodeType.INPUT or
-                genome.connections[idx].in_node.type == NodeType.BIAS):
+                    genome.connections[idx].in_node.type == NodeType.INPUT or
+                    genome.connections[idx].in_node.type == NodeType.BIAS):
                 _disable_connection_mutation(depth + 1)
                 return
             else:
@@ -341,7 +338,7 @@ class NEATEST(object):
             if self.random.random() < self.node_mutation_rate:
                 self.add_node_mutation(
                     new_genome,
-                    activation = self.hidden_activation)
+                    activation=self.hidden_activation)
             if self.random.random() < self.connection_mutation_rate:
                 self.add_connection_mutation(
                     new_genome)
@@ -352,16 +349,15 @@ class NEATEST(object):
 
     def calculate_grads(self, genome: ContextGenome):
         comm = MPI.COMM_WORLD
-        cp_genome: ContextGenome = genome.deepcopy() #type: ignore
+        cp_genome: ContextGenome = genome.deepcopy()  # type: ignore
         for i in reversed(range(len(cp_genome.connections))):
             if not cp_genome.connections[i].enabled:
                 del cp_genome.connections[i]
         weights: List[float] = [connection.weight.value
                                 for connection in cp_genome.connections]
         weights_array: Array = np.array(weights)
-        epsilon: Array = self.np_random.normal(0.0, self.sigma,
-                                          (self.es_population//2,
-                                           len(weights)))
+        epsilon: Array = self.np_random.normal(
+            0.0, self.sigma, (self.es_population//2, len(weights)))
         population_weights: Array = np.concatenate([weights_array + epsilon,
                                                     weights_array - epsilon])
 
@@ -370,14 +366,13 @@ class NEATEST(object):
         rewards_array: Array = np.zeros(self.es_population, dtype='d')
         for i in range(comm.rank*n_jobs, n_jobs * (comm.rank + 1)):
             for j, connection in enumerate(cp_genome.connections):
-                connection.weight = Weight(population_weights[i, j]) #type: ignore
+                connection.weight = Weight(population_weights[i, j])  # type: ignore
             rewards.append(self.agent.rollout(cp_genome))
         comm.Allgatherv([np.array(rewards, dtype=np.float64), MPI.DOUBLE],
-                            [rewards_array, MPI.DOUBLE])
+                        [rewards_array, MPI.DOUBLE])
         ranked_rewards: Array = rank_transformation(rewards_array)
         epsilon = np.concatenate([epsilon, -epsilon])
-        grads: Array = (np.dot(ranked_rewards, epsilon) /
-                        (self.es_population * self.sigma))
+        grads: Array = (np.dot(ranked_rewards, epsilon) / (self.es_population * self.sigma))
         grads = np.clip(grads, -1.0, 1.0)
 
         for gene_rate in self.gene_rates:
@@ -386,7 +381,7 @@ class NEATEST(object):
         idx = 0
         for connection in genome.connections:
             if connection.enabled:
-                connection.weight.grad = -grads[idx] #type: ignore
+                connection.weight.grad = -grads[idx]  # type: ignore
                 connection.dominant_gene_rate.value += 2 * self.dominant_gene_delta
                 idx += 1
 
@@ -439,7 +434,7 @@ class NEATEST(object):
             self.calculate_grads(genome)
             self.optimizer.step()
 
-    def crossover(self, genome_1:Genome, genome_2:Genome) -> ContextGenome:
+    def crossover(self, genome_1: Genome, genome_2: Genome) -> ContextGenome:
         '''Crossover two genomes by aligning their innovation numbers.'''
         connections: List[Connection] = []
         nodes: List[Node] = []
@@ -478,10 +473,10 @@ class NEATEST(object):
 
             in_node = Node(connection.in_node.id, connection.in_node.type,
                            connection.in_node.activation,
-                           depth = connection.in_node.depth)
+                           depth=connection.in_node.depth)
             out_node = Node(connection.out_node.id, connection.out_node.type,
                             connection.out_node.activation,
-                            depth = connection.out_node.depth)
+                            depth=connection.out_node.depth)
 
             nodes_dict = dict(zip(nodes, range(len(nodes))))
             if in_node not in nodes_dict:
@@ -492,16 +487,16 @@ class NEATEST(object):
                 nodes_dict[out_node] = len(nodes)-1
             connection = Connection(nodes[nodes_dict[in_node]],
                                     nodes[nodes_dict[out_node]],
-                                    innovation = connection.innovation,
-                                    weight = connection.weight,
-                                    dominant_gene_rate = connection.dominant_gene_rate)
+                                    innovation=connection.innovation,
+                                    weight=connection.weight,
+                                    dominant_gene_rate=connection.dominant_gene_rate)
             connection.enabled = enabled
             connections.append(connection)
         new_genome = ContextGenome(nodes, connections)
         return new_genome
 
     def save_logs(self):
-        import pandas as pd #type: ignore
+        import pandas as pd  # type: ignore
         data = pd.DataFrame(
             self.data, columns=['Generation', 'Algorithm', 'Seed', 'Reward'])
         data = data.astype(
@@ -511,7 +506,7 @@ class NEATEST(object):
 
     @staticmethod
     def sort_population(population: List[ContextGenome]) -> SortedContextGenomes:
-        return SortedContextGenomes(sorted(population, key = lambda x: x.fitness,
+        return SortedContextGenomes(sorted(population, key=lambda x: x.fitness,
                                            reverse=True))
 
     def get_random_genome(self) -> ContextGenome:

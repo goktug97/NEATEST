@@ -5,6 +5,7 @@ from dataclasses import dataclass
 class Version():
     major: int = 1
     minor: int = 0
-    patch: int = 5
+    patch: int = 6
+
 
 VERSION: Version = Version()

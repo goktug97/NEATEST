@@ -1,20 +1,20 @@
 import copy
-from typing import List, Union, Tuple, Dict
-import statistics
-from itertools import chain, repeat, islice
+from typing import List, Tuple
+from itertools import chain
+from dataclasses import dataclass
 
 from .node import Node, NodeType
 
 
+@dataclass
 class Weight():
-    def __init__(self, value):
-        self.value = value
-        self.grad = 0.0
+    value: float
+    grad: float = 0.0
 
 
+@dataclass
 class GeneRate():
-    def __init__(self, value):
-        self.value = value
+    value: float
 
 
 class Connection(object):
@@ -29,8 +29,8 @@ class Connection(object):
         self.innovation = innovation
         self.dominant_gene_rate = dominant_gene_rate
         self.weight = weight
-        if dummy: return
-        self.out_node.inputs.append(self)
+        if not dummy:
+            self.out_node.inputs.append(self)
 
     def __gt__(self, other):
         return self.innovation > other.innovation
@@ -65,6 +65,7 @@ class Connection(object):
         else:
             return str(self.innovation)
 
+
 def align_connections(
         connections_1: List[Connection],
         connections_2: List[Connection]) -> Tuple[
@@ -73,20 +74,17 @@ def align_connections(
     dummy_node = Node(0, NodeType.HIDDEN)
     dummy_connection = DummyConnection(dummy_node, dummy_node)
     end = dummy_connection
-    iterators = [chain(i, [end]) for i in [sorted(connections_1),
-        sorted(connections_2)]]
+    iterators = [chain(i, [end]) for i in [sorted(connections_1), sorted(connections_2)]]
     values = [next(i) for i in iterators]
     connections_1 = []
     connections_2 = []
     while not all(v is end for v in values):
         smallest = min(v for v in values if v is not end)
         alignment = []
-        match = True
         for v in values:
             if v.innovation == smallest.innovation:
                 alignment.append(v)
             else:
-                match = False
                 alignment.append(dummy_connection)
         connection_1, connection_2 = alignment
         connections_1.append(connection_1)
@@ -94,6 +92,7 @@ def align_connections(
         values = [next(i) if v.innovation == smallest.innovation else v
                   for i, v in zip(iterators, values)]
     return connections_1, connections_2
+
 
 class DummyConnection(Connection):
     def __init__(self, in_node: Node, out_node: Node):
