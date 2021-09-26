@@ -2,6 +2,7 @@ import unittest
 
 from neatest import Node, NodeType, group_nodes
 
+
 class TestNode(unittest.TestCase):
     def test_eq(self):
         a = Node(0, NodeType.INPUT)
@@ -32,6 +33,7 @@ class TestNode(unittest.TestCase):
         nodes = [a, b, c, d, e]
         self.assertEqual(group_nodes(nodes, by='depth'),
                          [[a, b], [e], [c, d]])
+
 
 if __name__ == '__main__':
     unittest.main()

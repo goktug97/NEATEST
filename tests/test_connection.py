@@ -3,6 +3,7 @@ import unittest
 from neatest import Connection, DummyConnection, Weight, GeneRate, align_connections
 from neatest import Node, NodeType
 
+
 class TestConnection(unittest.TestCase):
     def test_eq(self):
         connection_1 = DummyConnection(Node(0, NodeType.INPUT),
@@ -59,6 +60,7 @@ class TestConnection(unittest.TestCase):
         self.assertEqual(
             [dummy_connection, dummy_connection, c, d, e, dummy_connection],
             connections_2)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -4,6 +4,7 @@ from neatest import Connection, Weight, GeneRate
 from neatest import Node, NodeType
 from neatest import Genome
 
+
 class TestGenome(unittest.TestCase):
     def setUp(self):
         na = Node(0, NodeType.INPUT, depth=0.0)
@@ -24,7 +25,7 @@ class TestGenome(unittest.TestCase):
                              [ca, cb, cc, cd, ce, cf])
         self.recursive_genome = Genome([na, nb, nc, nd, ne, nf],
                                        [ca, cb, cc, cd, ce, cf, cg, ch])
-        
+
     def test_init(self):
         self.assertEqual(self.genome.input_size, 2)
         self.assertEqual(self.genome.output_size, 2)
@@ -60,6 +61,7 @@ class TestGenome(unittest.TestCase):
         self.assertIsNot(self.genome.connections[1].weight, genome.connections[1].weight)
         self.assertIsNot(self.genome.connections[1].dominant_gene_rate,
                          genome.connections[1].dominant_gene_rate)
+
 
 if __name__ == '__main__':
     unittest.main()
