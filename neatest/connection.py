@@ -35,6 +35,9 @@ class Connection(object):
     def __gt__(self, other):
         return self.innovation > other.innovation
 
+    def __lt__(self, other):
+        return self.innovation < other.innovation
+
     def __hash__(self):
         return hash(str(self.in_node.id)+str(self.out_node.id))
 

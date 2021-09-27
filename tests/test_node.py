@@ -1,6 +1,6 @@
 import unittest
 
-from neatest import Node, NodeType, group_nodes
+from neatest.node import Node, NodeType, group_nodes
 
 
 class TestNode(unittest.TestCase):

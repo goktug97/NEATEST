@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import random
-from typing import Union, List, Callable, Tuple, NewType, Dict, Type
+from typing import Union, List, Callable, Tuple, NewType, Dict, Type, Sequence
 import itertools
 import functools
 from abc import ABC, abstractmethod
@@ -15,7 +15,7 @@ try:
     disable_mpi = os.environ.get('NEATEST_DISABLE_MPI')
     if disable_mpi and disable_mpi != '0':
         raise ImportError
-    from mpi4py import MPI
+    from mpi4py import MPI  # type: ignore
 except ImportError:
     from .MPI import MPI
     MPI = MPI()
@@ -29,25 +29,23 @@ from .optimizers import Optimizer
 from .version import VERSION
 
 
-Array = Union[np.ndarray, np.generic]
-
 
 @functools.lru_cache(maxsize=1)
-def _center_function(population_size: int) -> Array:
+def _center_function(population_size: int) -> np.ndarray:
     centers = np.arange(0, population_size)
     centers = centers / (population_size - 1)
     centers -= 0.5
     return centers
 
 
-def _compute_ranks(rewards: Union[List[float], Array]) -> Array:
+def _compute_ranks(rewards: Union[List[float], np.ndarray]) -> np.ndarray:
     rewards = np.array(rewards)
     ranks = np.empty(rewards.size, dtype=int)
     ranks[rewards.argsort()] = np.arange(rewards.size)
     return ranks
 
 
-def rank_transformation(rewards: Union[List[float], Array]) -> Array:
+def rank_transformation(rewards: Union[List[float], np.ndarray]) -> np.ndarray:
     ranks = _compute_ranks(rewards)
     values = _center_function(len(rewards))
     return values[ranks]  # type: ignore
@@ -117,6 +115,7 @@ class NEATEST(object):
         self.n_networks = n_networks
         self.input_size = input_size
         self.output_size = output_size
+        self.hidden_layers = hidden_layers
         self.bias = bias
         self.sigma = sigma
         self.save_checkpoint_n = save_checkpoint_n
@@ -152,9 +151,10 @@ class NEATEST(object):
                 from pathlib import Path
                 Path(self.logdir).mkdir(parents=True, exist_ok=True)
 
-        self.create_population(hidden_layers)
 
-    def random_genome(self, hidden_layers) -> ContextGenome:
+        self.population = self.create_population()
+
+    def random_genome(self) -> ContextGenome:
         '''Create fc neural network with random weights.'''
         layers = []
         connections: List[Connection] = []
@@ -168,8 +168,8 @@ class NEATEST(object):
         layers.append(input_nodes)
 
         # Hidden Nodes
-        for idx, hidden_layer in enumerate(hidden_layers):
-            depth = 1 / (len(hidden_layers) + 1) * (idx + 1)
+        for idx, hidden_layer in enumerate(self.hidden_layers):
+            depth = 1 / (len(self.hidden_layers) + 1) * (idx + 1)
             hidden_nodes = [Node(next(self.node_id_generator),
                                  NodeType.HIDDEN,
                                  self.hidden_activation,
@@ -205,11 +205,11 @@ class NEATEST(object):
         nodes: List[Node] = functools.reduce(operator.iconcat, layers, [])
         return ContextGenome(nodes, connections)
 
-    def create_population(self, hidden_layers) -> None:
-        population: List[ContextGenome] = [self.random_genome(hidden_layers)]
-        for _ in range(self.n_networks):
+    def create_population(self) -> List[ContextGenome]:
+        population: List[ContextGenome] = [self.random_genome()]
+        for _ in range(self.n_networks - 1):
             population.append(population[0].copy())
-        self.population = population
+        return population
 
     def register_connection(self, dummy_connection: DummyConnection):
         if dummy_connection in self.connections:
@@ -355,24 +355,24 @@ class NEATEST(object):
                 del cp_genome.connections[i]
         weights: List[float] = [connection.weight.value
                                 for connection in cp_genome.connections]
-        weights_array: Array = np.array(weights)
-        epsilon: Array = self.np_random.normal(
+        weights_array: np.ndarray = np.array(weights)
+        epsilon: np.ndarray = self.np_random.normal(
             0.0, self.sigma, (self.es_population//2, len(weights)))
-        population_weights: Array = np.concatenate([weights_array + epsilon,
+        population_weights: np.ndarray = np.concatenate([weights_array + epsilon,
                                                     weights_array - epsilon])
 
         n_jobs = self.es_population // comm.Get_size()
         rewards: List[float] = []
-        rewards_array: Array = np.zeros(self.es_population, dtype='d')
+        rewards_array: np.ndarray = np.zeros(self.es_population, dtype='d')
         for i in range(comm.rank*n_jobs, n_jobs * (comm.rank + 1)):
             for j, connection in enumerate(cp_genome.connections):
                 connection.weight = Weight(population_weights[i, j])  # type: ignore
             rewards.append(self.agent.rollout(cp_genome))
         comm.Allgatherv([np.array(rewards, dtype=np.float64), MPI.DOUBLE],
                         [rewards_array, MPI.DOUBLE])
-        ranked_rewards: Array = rank_transformation(rewards_array)
+        ranked_rewards: np.ndarray = rank_transformation(rewards_array)
         epsilon = np.concatenate([epsilon, -epsilon])
-        grads: Array = (np.dot(ranked_rewards, epsilon) / (self.es_population * self.sigma))
+        grads: np.ndarray = (np.dot(ranked_rewards, epsilon) / (self.es_population * self.sigma))
         grads = np.clip(grads, -1.0, 1.0)
 
         for gene_rate in self.gene_rates:
@@ -511,9 +511,9 @@ class NEATEST(object):
 
     def get_random_genome(self) -> ContextGenome:
         """Return random genome from a sorted population."""
-        rewards: Array = np.array([genome.fitness for genome in self.population])
+        rewards: np.ndarray = np.array([genome.fitness for genome in self.population])
         eps = np.finfo(float).eps
-        normalized_rewards: Array = rewards - rewards.min() + eps
+        normalized_rewards: np.ndarray = rewards - rewards.min() + eps
         probabilities = normalized_rewards / np.sum(normalized_rewards)
         return self.np_random.choice(self.population, p=probabilities)
 

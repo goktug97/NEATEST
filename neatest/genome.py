@@ -11,7 +11,7 @@ try:
     disable_mpi = os.environ.get('NEATEST_DISABLE_MPI')
     if disable_mpi and disable_mpi != '0':
         raise ImportError
-    from mpi4py import MPI
+    from mpi4py import MPI  # type: ignore
 except ImportError:
     from .MPI import MPI
     MPI = MPI()

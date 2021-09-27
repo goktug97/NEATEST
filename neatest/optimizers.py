@@ -6,9 +6,6 @@ import numpy as np
 from .connection import Weight
 
 
-Array = Union[np.ndarray, np.generic]
-
-
 class Optimizer(ABC):
     def __init__(self, weights: List[Weight], **kwargs):
         self.weights = weights
@@ -32,8 +29,8 @@ class Adam(Optimizer):
         self.epsilon = epsilon
         self.weights = weights
 
-        self.m: Array = np.zeros(len(weights))
-        self.v: Array = np.zeros(len(weights))
+        self.m: np.ndarray = np.zeros(len(weights))
+        self.v: np.ndarray = np.zeros(len(weights))
 
         self.t: int = 0
 
@@ -42,7 +39,7 @@ class Adam(Optimizer):
         pad_size = len(self.weights) - self.m.size
         self.m = np.concatenate([self.m, np.zeros(pad_size)])
         self.v = np.concatenate([self.v, np.zeros(pad_size)])
-        gradients: Array = np.array([weight.grad for weight in self.weights])
+        gradients: np.ndarray = np.array([weight.grad for weight in self.weights])
         lr = self.lr * (np.sqrt(1 - np.power(self.beta_2, self.t)) /
                         (1 - np.power(self.beta_1, self.t)))
         self.m = self.beta_1 * self.m + (1 - self.beta_1) * gradients

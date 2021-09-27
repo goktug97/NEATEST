@@ -6,7 +6,6 @@ import random
 
 import numpy as np
 
-Array = Union[np.ndarray, np.generic]
 
 class Version():
     major: int
@@ -19,13 +18,13 @@ class Version():
         ...
 
 @functools.lru_cache(maxsize=1)
-def _center_function(population_size: int) -> Array:
+def _center_function(population_size: int) -> np.ndarray:
     ...
 
-def _compute_ranks(rewards: Union[List[float], Array]) -> Array:
+def _compute_ranks(rewards: Union[List[float], np.ndarray]) -> np.ndarray:
     ...
 
-def rank_transformation(rewards: Union[List[float], Array]) -> Array:
+def rank_transformation(rewards: Union[List[float], np.ndarray]) -> np.ndarray:
     ...
 
 @functools.total_ordering
@@ -45,7 +44,7 @@ def steepened_sigmoid(x: float) -> float:
 def relu(x: float) -> float:
     ...
 
-def leaky_relu(x: float) -> float:
+def leaky_relu(x: float, negative_slope: float) -> float:
     ...
 
 def tanh(x: float) -> float:
@@ -64,6 +63,12 @@ class Node():
     def __eq__(self, other: object) -> bool:
         ...
 
+    def __lt__(self, other: object) -> bool:
+        ...
+
+    def __add__(self, other: object) -> int:
+        ...
+
     def copy(self) -> 'Node':
         ...
 
@@ -77,8 +82,7 @@ def group_nodes(nodes: List[Node], by: str) -> List[List[Node]]:
     ...
 
 class Weight():
-    grad: float
-    def __init__(self, value: float):
+    def __init__(self, value: float, grad: float):
         ...
 
 class GeneRate():
@@ -191,8 +195,8 @@ class Agent(ABC):
         ...
 
 class Adam(Optimizer):
-    m: Array
-    v: Array
+    m: np.ndarray
+    v: np.ndarray
     t: int
     def __init__(self, weights: List[Weight], lr: float, beta_1: float = ...,
                  beta_2: float = ..., epsilon: float = ...):
@@ -210,7 +214,7 @@ class NEATEST(object):
     version: Version
     n_proc: int
     random: random.Random
-    np_random: np.random.mtrand.RandomState
+    np_random: np.random.RandomState
     weights: List[Weight]
     gene_rates: List[GeneRate]
     optimizer: Optimizer
@@ -261,7 +265,7 @@ class NEATEST(object):
     def random_genome(self) -> ContextGenome:
         ...
 
-    def create_population(self) -> None:
+    def create_population(self) -> List[ContextGenome]:
         ...
 
     def save_logs(self) -> None:

@@ -1,8 +1,8 @@
 import unittest
 
-from neatest import Connection, Weight, GeneRate
-from neatest import Node, NodeType
-from neatest import Genome
+from neatest.connection import Connection, Weight, GeneRate
+from neatest.node import Node, NodeType
+from neatest.genome import Genome
 
 
 class TestGenome(unittest.TestCase):

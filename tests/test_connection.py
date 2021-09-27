@@ -1,7 +1,7 @@
 import unittest
 
-from neatest import Connection, DummyConnection, Weight, GeneRate, align_connections
-from neatest import Node, NodeType
+from neatest.connection import Connection, DummyConnection, Weight, GeneRate, align_connections
+from neatest.node import Node, NodeType
 
 
 class TestConnection(unittest.TestCase):

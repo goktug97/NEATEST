@@ -7,9 +7,6 @@ import numpy as np
 import neatest
 
 
-Array = Union[np.ndarray, np.generic]
-
-
 class Agent(neatest.Agent):
     def __init__(self):
         self.env = gym.make('CartPole-v1')
@@ -17,10 +14,10 @@ class Agent(neatest.Agent):
     def rollout(self, genome: neatest.Genome, render=False) -> float:
         total_reward: float = 0.0
         for i in range(10):
-            observation: Array = self.env.reset()
+            observation: np.ndarray = self.env.reset()
             done: bool = False
             while not done:
-                output: np.int = np.argmax(genome(cast(List[float], observation)))
+                output: np.int32 = np.argmax(genome(cast(List[float], observation)))
                 observation, reward, done, info = self.env.step(output)
                 if render:
                     self.env.render()
@@ -34,7 +31,7 @@ SEED = 123
 agent.env.seed(SEED)
 agent.env.action_space.seed(SEED)
 
-a = neatest.NEATEST(
+neat = neatest.NEATEST(
     agent,
     neatest.Adam,
     n_networks=128,
@@ -55,10 +52,10 @@ a = neatest.NEATEST(
     node_mutation_rate=0.3,
     connection_mutation_rate=0.3)
 
-a.train(10)
+neat.train(10)
 
-print(a.best_genome)
-a.best_genome.save('CartPole.genome')
-print(agent.rollout(a.best_genome, render=True))
+print(neat.best_genome)
+neat.best_genome.save('CartPole.genome')
+print(agent.rollout(neat.best_genome, render=True))
 
 agent.env.close()
